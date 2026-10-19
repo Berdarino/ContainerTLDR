@@ -1,0 +1,70 @@
+{
+  "html_url": "https://github.com/tailscale/caddy-tailscale/compare/6911d07a13eca7605ea1c0ec985d858cf2408393...de41b249af4fd2083612c3b2303197e92787d1c5",
+  "status": "ahead",
+  "total_commits": 7,
+  "commits": [
+    {
+      "sha": "662ef34c64b102e9a23da608a663bc65f7202ace",
+      "commit": {
+        "message": "Allow AdvertiseTags to be passed to tsnet.Server\n\nSigned-off-by: Chris Hoage <iam@chrishoage.com>",
+        "committer": {
+          "date": "2025-11-17T03:39:14Z"
+        }
+      }
+    },
+    {
+      "sha": "d4b1ed3aaf40d92bf7a415df8130c14acafe2827",
+      "commit": {
+        "message": "Bump tailscale to v1.90.9 to address TS-2025-008 vulnerability\n\nSigned-off-by: Francois Pigerre <3946887+fpigerre@users.noreply.github.com>",
+        "committer": {
+          "date": "2025-12-03T00:30:52Z"
+        }
+      }
+    },
+    {
+      "sha": "e09dc995a501cfb585baf844f7438053d98f8d35",
+      "commit": {
+        "message": "fix: check if innerLn is valid before is zero.\n\nSigned-off-by: Oli Strik <strik@olii.nl>",
+        "committer": {
+          "date": "2025-12-04T16:46:54Z"
+        }
+      }
+    },
+    {
+      "sha": "f070d146dd6169aa29376ee9ac5a3e16763f9cb2",
+      "commit": {
+        "message": "Dockerfile: update git\n\nApparently the old version isn't even available in the package server\nanymore?  That's pretty annoying, and kinda makes me question pinning\nthe version.  For now, I'll just bump it, but might just need to drop it\nentirely and take the latest version.  We're not using it for much\nanyway.\n\nAlso fix a few Dockerfile linting issues.\n\nUpdates #cleanup\n\nChange-Id: Ia101a4a3005adb9118051b3416f5a64a4a45987d\nSigned-off-by: Will Norris <will@tailscale.com>",
+        "committer": {
+          "date": "2025-12-04T17:18:25Z"
+        }
+      }
+    },
+    {
+      "sha": "413764819c5e29dc98d864aaf960ae0f83e00bc5",
+      "commit": {
+        "message": "all: cleanup minor linting issues and license language\n\n- change \"AUTHORS\" to \"contributors\" in copyright line, since we don't\n  maintain an AUTHORS file in this repo.\n- fix use of deprecated tailscale.LocalClient\n- remove embedded fields in selector when not needed\n- add some missing error checks\n\nUpdates #cleanup\n\nChange-Id: Ia101a4a3005adb9118051b3416f5a64a4a45987d\nSigned-off-by: Will Norris <will@tailscale.com>",
+        "committer": {
+          "date": "2025-12-25T05:16:18Z"
+        }
+      }
+    },
+    {
+      "sha": "bb080c4414acd465d8be93b4d8f907dbb2ab2544",
+      "commit": {
+        "message": "Add a pointer to the default_bind global option\n\nSigned-off-by: Michael Diamond <dimo414@gmail.com>",
+        "committer": {
+          "date": "2026-01-06T22:23:16Z"
+        }
+      }
+    },
+    {
+      "sha": "de41b249af4fd2083612c3b2303197e92787d1c5",
+      "commit": {
+        "message": "Update Tailscale 1.90.9 -> 1.102.2 (#138)\n\n* Update Tailscale 1.90.9 -> 1.102.1\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n* Update Tailscale dependencies as required for build\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n* Bump Tailscale 1.102.1 -> 1.102.2\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n* Update golangci-lint 2.5.0 -> 2.6.0 to support go v1.26\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n* Update golangci-lint 2.6.0 -> 2.7.0 to support go v1.26\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n* Update golangci-lint 2.7.0 -> 2.12.0 to support go v1.26.5\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>\n\n---------\n\nSigned-off-by: nathanwasson <126016071+nathanwasson@users.noreply.github.com>",
+        "committer": {
+          "date": "2026-08-26T18:03:04Z"
+        }
+      }
+    }
+  ]
+}
