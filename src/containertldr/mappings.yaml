@@ -1,0 +1,36 @@
+# Defaults for widely used images whose own labels don't say where their release notes are, or say it
+# wrong. Images that aren't listed use their org.opencontainers.image.source label or their
+# ghcr.io/owner/name path, which is enough for most.
+#
+# To change how an image is handled on your setup, put containertldr.* labels on its container instead
+# (containertldr.repo, .version, .tag-prefix, .notes-url, .commits); they win over this file.
+#
+# Keys are image names without a tag. lscr.io and ghcr.io names are interchangeable, and Docker Hub
+# images can be written short (redis) or long (docker.io/library/redis).
+#
+#   repo        upstream GitHub repo as owner/name; null when there's no usable GitHub repo
+#   version     where the image keeps its app version: label (org.opencontainers.image.version, the
+#               default), env:NAME, or none to pick releases by the images' build dates instead
+#   tag_prefix  only release tags starting with this count (monorepos)
+#   commits     the image is built from a branch: summarise the commits between the two builds
+#   notes_url   link to show when GitHub has no usable release notes
+#
+# Unlisted LinuxServer images fall back to linuxserver/docker-<app>. Some of its releases copy the app's
+# notes (radarr), others only say which version they updated to (lidarr), so the entries below point
+# straight at the app instead.
+
+lscr.io/linuxserver/radarr:            { repo: Radarr/Radarr }
+lscr.io/linuxserver/sonarr:            { repo: Sonarr/Sonarr }
+lscr.io/linuxserver/lidarr:            { repo: Lidarr/Lidarr }
+lscr.io/linuxserver/prowlarr:          { repo: Prowlarr/Prowlarr }
+lscr.io/linuxserver/bazarr:            { repo: morpheus65535/bazarr }
+lscr.io/linuxserver/qbittorrent:       { repo: qbittorrent/qBittorrent }
+
+jellyfin/jellyfin:                     { repo: jellyfin/jellyfin }  # its source label points at the packaging repo
+ghcr.io/home-assistant/home-assistant: { repo: home-assistant/core }  # the ghcr.io path names the wrong repo
+ollama/ollama:                         { repo: ollama/ollama, version: none }
+tailscale/tailscale:                   { repo: tailscale/tailscale, version: none, notes_url: "https://tailscale.com/changelog" }
+
+postgres:                              { repo: null, version: "env:PG_VERSION", notes_url: "https://www.postgresql.org/docs/release/" }
+redis:                                 { repo: redis/redis, version: "env:REDIS_VERSION" }
+eclipse-mosquitto:                     { repo: null, notes_url: "https://mosquitto.org/ChangeLog.txt" }
