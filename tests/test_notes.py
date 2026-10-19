@@ -48,6 +48,19 @@ def test_clean_home_assistant_link_references():
     )
 
 
+def test_clean_changesets_credits():
+    body = (
+        "- [#1531](https://github.com/papra-hq/papra/pull/1531) "
+        "[`4ac1d68`](https://github.com/papra-hq/papra/commit/4ac1d68e472b115a21bfd3316946a1170076a762) "
+        "Thanks [@CorentinTh](https://github.com/CorentinTh)! - Added Hungarian translation\n"
+        "- [#1461](https://github.com/papra-hq/papra/pull/1461) "
+        "[`5d3063b`](https://github.com/papra-hq/papra/commit/5d3063b) "
+        "Thanks [@bartdenhoed](https://github.com/bartdenhoed), [@CorentinTh](https://github.com/CorentinTh)! "
+        "- Fixed refresh"
+    )
+    assert clean_body(body) == "- #1531 Added Hungarian translation\n- #1461 Fixed refresh"
+
+
 def test_clean_links_and_images():
     body = "![screenshot](https://example.com/a.png)\nSee [the upgrade guide](https://docs.example.com/upgrade) first."
     assert clean_body(body) == "See the upgrade guide first."

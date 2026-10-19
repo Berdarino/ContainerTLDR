@@ -13,6 +13,8 @@ _CLEANUP = [
     (re.compile(r"^\[[^\]]+\]:\s*<?https?://.*$", re.M), ""),
     (re.compile(r"\[([^\]]+)\]\(https?://[^)]*\)"), r"\1"),
     (re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/(?:pull|issues)/(\d+)"), r"#\1"),
+    # Changesets credits: "- #1474 `aa26524` Thanks @CorentinTh! - Added ..." once the links are gone
+    (re.compile(r"`[0-9a-f]{7,40}` Thanks [^!\n]*! - "), ""),
     # GitHub's generated notes: new contributors and the compare link
     (re.compile(r"^#+ New Contributors$|^.*made their first contribution.*$", re.M), ""),
     (re.compile(r"^\*\*Full Changelog\*\*.*$", re.M), ""),
