@@ -81,3 +81,28 @@ def test_unknown_versions_fall_back_to_build_dates():
     ]
     assert select(frigate, None, None, since="2026-09-17", until="2026-10-17") == ["v0.17.0"]
     assert select(frigate, "main", "main", since="2026-08-01", until="2026-09-18") == ["v0.16.3", "v0.16.4"]
+
+
+# linuxserver/docker-radarr: a release per rebuild, plus develop and nightly branches in the same repo. Whether
+# they're flagged as pre-releases shouldn't matter, so they aren't here.
+LSIO_RADARR = [
+    rel("6.4.4.10685-ls322", "2026-10-19"),
+    rel("develop-6.4.4.10690-ls272", "2026-10-19"),
+    rel("nightly-7.0.0.10788-ls27", "2026-10-18"),
+    rel("6.4.4.10685-ls321", "2026-10-12"),
+    rel("develop-6.4.4.10685-ls271", "2026-10-12"),
+    rel("6.4.4.10685-ls320", "2026-10-05"),
+    rel("develop-6.4.3.10650-ls260", "2026-10-01"),
+    rel("6.4.3.10600-ls319", "2026-09-28"),
+]
+
+
+def test_one_release_per_version_from_the_running_branch():
+    assert select(LSIO_RADARR, "6.4.3.10600-ls319", "6.4.4.10685-ls320") == ["6.4.4.10685-ls322"]
+
+
+def test_develop_image_follows_develop_tags():
+    assert select(LSIO_RADARR, "develop-6.4.3.10650-ls260", "develop-6.4.4.10690-ls272") == [
+        "develop-6.4.4.10685-ls271",
+        "develop-6.4.4.10690-ls272",
+    ]

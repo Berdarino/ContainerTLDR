@@ -18,6 +18,8 @@ _CLEANUP = [
     # GitHub's generated notes: new contributors and the compare link
     (re.compile(r"^#+ New Contributors$|^.*made their first contribution.*$", re.M), ""),
     (re.compile(r"^\*\*Full Changelog\*\*.*$", re.M), ""),
+    # LinuxServer's test report link
+    (re.compile(r"^\*\*CI Report:\*\*\s+\S+$", re.M), ""),
     (re.compile(r"[ \t]+$", re.M), ""),
     (re.compile(r"\n{3,}"), "\n\n"),
 ]

@@ -61,6 +61,40 @@ def test_clean_changesets_credits():
     assert clean_body(body) == "- #1531 Added Hungarian translation\n- #1461 Fixed refresh"
 
 
+def test_clean_linuxserver_release():
+    body = """**CI Report:**
+
+https://ci-tests.linuxserver.io/linuxserver/radarr/6.4.4.10685-ls322/index.html
+
+**LinuxServer Changes:**
+
+
+* sed commit sha tags in release notes by @aptalca in https://github.com/linuxserver/docker-radarr/pull/271
+
+
+**Full Changelog**: https://github.com/linuxserver/docker-radarr/compare/6.4.4.10685-ls321...6.4.4.10685-ls322
+
+**Remote Changes:**
+
+## Changes:
+
+* [a96bf7](https://github.com/Radarr/Radarr/commit/a96bf7c3ecb23cb76993770727285dc17a613fbc) Translations updated
+"""
+    assert clean_body(body) == "\n".join(
+        [
+            "**LinuxServer Changes:**",
+            "",
+            "* sed commit sha tags in release notes by @aptalca in #271",
+            "",
+            "**Remote Changes:**",
+            "",
+            "## Changes:",
+            "",
+            "* a96bf7 Translations updated",
+        ]
+    )
+
+
 def test_clean_links_and_images():
     body = "![screenshot](https://example.com/a.png)\nSee [the upgrade guide](https://docs.example.com/upgrade) first."
     assert clean_body(body) == "See the upgrade guide first."
