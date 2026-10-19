@@ -61,6 +61,19 @@ def build_notes(releases: list[Release], budget: int) -> Notes:
     return Notes("\n\n".join(parts), len(releases) - start, truncated, sum(len(b) for b in bodies))
 
 
+def brief_notes(releases: list[Release], lines: int = 5) -> str:
+    """The first few lines of each release, for when no LLM is configured.
+
+    Newest first, so that a length limit further down (Discord's 4096) cuts the oldest releases.
+    """
+    parts = []
+    for r in reversed(releases):
+        body = [line for line in clean_body(r.body).splitlines() if line.strip() and not line.startswith("#")]
+        more = "\n…" if len(body) > lines else ""
+        parts.append("\n".join([f"**{r.tag}**", *body[:lines]]) + more)
+    return "\n\n".join(parts)
+
+
 def _share(lengths: list[int], budget: int) -> list[int]:
     """Split budget so that short items keep their full length and the rest get equal shares of what's left."""
     limits = [0] * len(lengths)

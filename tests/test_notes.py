@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from containertldr.notes import build_notes, clean_body
+from containertldr.notes import brief_notes, build_notes, clean_body
 from containertldr.releases import Release
 
 
@@ -93,3 +93,23 @@ def test_body_chars_ignore_headers():
     releases = [rel(f"v1.90.{i}", f"2026-10-0{i}", "Changelog: https://tailscale.com/changelog") for i in range(1, 5)]
     notes = build_notes(releases, 18000)
     assert notes.body_chars < 200 < len(notes.text)
+
+
+def test_brief_notes_newest_first_without_headings():
+    releases = [
+        rel("v1.6.1", "2026-09-01", "### Fixes\n- one\n\n- two"),
+        rel("v1.6.2", "2026-09-10", "## What's Changed\n" + "\n".join(f"- change {i}" for i in range(8))),
+    ]
+    assert brief_notes(releases, lines=3) == "\n".join(
+        [
+            "**v1.6.2**",
+            "- change 0",
+            "- change 1",
+            "- change 2",
+            "…",
+            "",
+            "**v1.6.1**",
+            "- one",
+            "- two",
+        ]
+    )
