@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "digest": "sha256:ba5f79fa471084ef7d7c3cba04b0f494da7db3c797a1b88f660d269009351d11",
+    "size": 9041
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:fea89f12c5a17d69248be0c128ff65371348426b385dc482ac4b9e892c91872c",
+      "size": 7083549
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:f6a4c3e338ed76d3e90c1ce7a15013a45c9b55febc952bc905eed245ce0bb8d2",
+      "size": 6239
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:0ada40b0b6691b34e299415683dbf71b1a054e00646405bd8eb0e369c6ed786d",
+      "size": 1360
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:ff8b27c4b6403cf3397ea419024830095fb0f566e62f58f98d55eb7f0763501e",
+      "size": 702
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:f0421282dda7e5f920f4c0a221948c5b8ca157747d04d071d6a85528a9900848",
+      "size": 429
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:4e49d0bdc499e754426135e7acfb2d4dfd34b93f311baf02d5aec0768f8f8f33",
+      "size": 6320232
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:1f684de2fc7cd8ec4864efa066d444ff5217d19910bc6738c54c5c74d5557d77",
+      "size": 4628
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:dc5186d428a798deefb9cfd051f3efc6b6589caad112aa78f7f2c13bc1d42069",
+      "size": 75123553
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:6905b2cb1f7051c0df5c96128b6a857c39d6c568adb7bd1c8a316df825368b0e",
+      "size": 1033
+    }
+  ]
+}

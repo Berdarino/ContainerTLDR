@@ -1,0 +1,273 @@
+{
+  "manifests": [
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "amd64",
+        "org.opencontainers.image.base.digest": "sha256:1f3591b8a02ea153f41c5bba878ad477f63ab3d19349762cb77504db02a23e15",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:27:51Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:d7a884c0cf48d8a8fa9df8d577c56bde37a036f1035e0e77e2c95948de2ba066",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      "size": 2288
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "amd64",
+        "vnd.docker.reference.digest": "sha256:d7a884c0cf48d8a8fa9df8d577c56bde37a036f1035e0e77e2c95948de2ba066",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:536adec542328255ff14c10a9ae44070d0d64ebdae5ada1c3a528687f45b967d",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm32v6",
+        "org.opencontainers.image.base.digest": "sha256:940ac6c2135e9854a9a27d1eb1e309deca9ecf635f627ffe5c4bae15c09031a0",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:25:56Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:a1844c7cd0ab5679fa7292872b4dbecc8ca1352f27fdf2556c72f289d650e8d3",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "arm",
+        "os": "linux",
+        "variant": "v6"
+      },
+      "size": 2290
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm32v6",
+        "vnd.docker.reference.digest": "sha256:a1844c7cd0ab5679fa7292872b4dbecc8ca1352f27fdf2556c72f289d650e8d3",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:0831c810c9662f6f973b489cb2ad3dd3b3b97faa497a022b980139c44ff0fdae",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 567
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm32v7",
+        "org.opencontainers.image.base.digest": "sha256:01fc600184502f33b6a72cb846c773fa8937eb1a6638ecf80425609643c1222c",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:27:55Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:c46b8ad7180f5d32319e68d6556875889940599530e76b30e3ea3cf2ac8adc68",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "arm",
+        "os": "linux",
+        "variant": "v7"
+      },
+      "size": 2290
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm32v7",
+        "vnd.docker.reference.digest": "sha256:c46b8ad7180f5d32319e68d6556875889940599530e76b30e3ea3cf2ac8adc68",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:f323d19e85df6286ee0bc4956e83c2f3ef6da3233341d96b29ad581890eb2e69",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm64v8",
+        "org.opencontainers.image.base.digest": "sha256:ae959799024a09da597284763c417a6e820e020fad0634c5267cf4f125e682bf",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:27:27Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:d184fed96d9eae8f3f7073cf37788ff7b86927e22dd7a59acf66973a7f551fb8",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux",
+        "variant": "v8"
+      },
+      "size": 2290
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "arm64v8",
+        "vnd.docker.reference.digest": "sha256:d184fed96d9eae8f3f7073cf37788ff7b86927e22dd7a59acf66973a7f551fb8",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:e309a31d13e505ac7011d1c6eb08f8044e85123a8df7b6d83ba67876d85209f2",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "i386",
+        "org.opencontainers.image.base.digest": "sha256:1d697970a375ffb80e76832bf191df2433265118bbe6465f3fcc3609db25ba60",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:27:18Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:a6635960cb0ad28fa34d0688bd46b97d92aa5258ceab5629d752266523fa04aa",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "386",
+        "os": "linux"
+      },
+      "size": 2287
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "i386",
+        "vnd.docker.reference.digest": "sha256:a6635960cb0ad28fa34d0688bd46b97d92aa5258ceab5629d752266523fa04aa",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:2ac2c4fde3cb3915943774d1aaa1a9e577b486cd2e0d402adf36906db59cd02d",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "ppc64le",
+        "org.opencontainers.image.base.digest": "sha256:a90563207a966a99785b5fc1d4fe2e10ff59f14d731f9b803597a01e4a60eda3",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:28:56Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:7eb014ac0f69ecf867109399628f57fab2c1f499c8a7c2b28ae8221576b63777",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "ppc64le",
+        "os": "linux"
+      },
+      "size": 2290
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "ppc64le",
+        "vnd.docker.reference.digest": "sha256:7eb014ac0f69ecf867109399628f57fab2c1f499c8a7c2b28ae8221576b63777",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:9df03b3eaa31ed4aaabc09cdcffaee6c8158713a57fefa623844f6f4173c9b46",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "riscv64",
+        "org.opencontainers.image.base.digest": "sha256:bbf2352902a37973a27d69f5d6258f37b4effd7c99a9bb839fcc4992e33e0312",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-24T20:43:02Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:3b3efa003e22548afc649fe2a835a5754a7607a5d9a709486fba8baea06003d6",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "riscv64",
+        "os": "linux"
+      },
+      "size": 2290
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "riscv64",
+        "vnd.docker.reference.digest": "sha256:3b3efa003e22548afc649fe2a835a5754a7607a5d9a709486fba8baea06003d6",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:512723feda539a0a4778f8f0605062249a94f0615b1ae582efee7c9d08a4c0fe",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "s390x",
+        "org.opencontainers.image.base.digest": "sha256:7a392c4803b2184878bbda75d526c5768782fa0587b45502b60c988535620400",
+        "org.opencontainers.image.base.name": "alpine:3.23",
+        "org.opencontainers.image.created": "2026-09-21T17:25:41Z",
+        "org.opencontainers.image.revision": "19668eeec647317654725705506aaf25e1c08ac1",
+        "org.opencontainers.image.source": "https://github.com/redis/docker-library-redis.git#19668eeec647317654725705506aaf25e1c08ac1:alpine",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/redis",
+        "org.opencontainers.image.version": "8.8.3-alpine"
+      },
+      "digest": "sha256:aea455a25a6e8dd4fd0c608af392df06be8585be63b474472e205553a71e9a69",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "s390x",
+        "os": "linux"
+      },
+      "size": 2288
+    },
+    {
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "s390x",
+        "vnd.docker.reference.digest": "sha256:aea455a25a6e8dd4fd0c608af392df06be8585be63b474472e205553a71e9a69",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "digest": "sha256:6bacbeb62bd0f9d253c049053b742462f0aff786c904225927921eb119237f0a",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      },
+      "size": 840
+    }
+  ],
+  "mediaType": "application/vnd.oci.image.index.v1+json",
+  "schemaVersion": 2
+}
