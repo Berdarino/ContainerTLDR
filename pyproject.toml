@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Container update notifications with an LLM summary of the upstream release notes"
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [{ name = "Berdarino", email = "contact@bernardwong.dev" }]
 dependencies = []
 
 [build-system]
