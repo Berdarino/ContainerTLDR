@@ -17,6 +17,7 @@ LABELS = {
     "commits": "commits",
 }
 OCI_SOURCE = "org.opencontainers.image.source"
+GUESSES = ("image source label", "ghcr path")  # how a repo was found when nobody said which it is
 _GITHUB_URL = re.compile(r"https?://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?")
 
 

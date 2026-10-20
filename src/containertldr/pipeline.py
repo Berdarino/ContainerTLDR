@@ -11,7 +11,7 @@ from .notes import brief_notes, build_notes
 from .notify import Notifier, NotifyError
 from .registry import Registry, RegistryError, Unavailable
 from .releases import Release, select_releases
-from .resolve import Upstream, load_mappings, resolve
+from .resolve import GUESSES, Upstream, load_mappings, resolve
 from .state import State, state_key
 from .versions import parse_version, read_version
 
@@ -229,7 +229,7 @@ class Checker:
                 footer = f"Summarised by {result.model} from {counted}"
                 if notes.truncated:
                     footer += ", shortened to fit"
-        if upstream.found_by in ("image source label", "ghcr path"):
+        if upstream.found_by in GUESSES:
             footer += f" · repo {upstream.repo} guessed from the {upstream.found_by}"
         return Update(group.containers, group.ref, group.stacks, change.current, change.new, summary, link, footer)
 

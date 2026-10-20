@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Containers{% endblock %}
+{% block main %}
+<h2>Containers</h2>
+{% if error %}
+<p class="errors">{{ error }}</p>
+{% else %}
+<p class="muted">How the next check will read each running image. Highlighted rows probably need a
+<code>containertldr.*</code> label on the container.</p>
+{% set found_by = {
+  "label": "containertldr.repo label",
+  "mappings": "built-in default",
+  "image source label": "guessed from the image's source label",
+  "ghcr path": "guessed from the ghcr.io path",
+} %}
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Containers</th><th>Image</th><th>Release notes</th><th>Version</th><th>Newer image</th></tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    {% set u = row.upstream %}
+    <tr{% if row.needs_fix %} class="fix"{% endif %}>
+      <td>
+        {{ row.group.containers | join(", ") }}
+        {% if row.group.stacks %}<div class="muted">{{ row.group.stacks | join(", ") }}</div>{% endif %}
+        {% for key, value in row.group.labels | dictsort %}
+        <div><code>{{ key }}={{ value }}</code></div>
+        {% endfor %}
+      </td>
+      <td><code>{{ row.group.ref }}</code></td>
+      {% if row.error %}
+      <td colspan="2" class="warn">{{ row.error }}</td>
+      {% else %}
+      <td>
+        {% if u.repo %}
+        <a href="https://github.com/{{ u.repo }}">{{ u.repo }}</a>
+        <div class="{{ 'warn' if row.guessed else 'muted' }}">{{ found_by[u.found_by] }}</div>
+        {% elif u.notes_url %}
+        <a href="{{ u.notes_url }}">{{ u.notes_url }}</a>
+        <div class="muted">not on GitHub</div>
+        {% else %}
+        <span class="warn">None found</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if u.commits %}
+        <span class="muted">Compares commits</span>
+        {% elif u.version is none %}
+        <span class="muted">Goes by build dates</span>
+        {% else %}
+        {% if row.version %}{{ row.version }}{% else %}<span class="warn">None found</span>{% endif %}
+        <div class="muted">{{ "version label" if u.version == "label" else u.version }}</div>
+        {% endif %}
+      </td>
+      {% endif %}
+      <td>
+        {% if row.entry and row.entry.message %}<a href="/">Update waiting</a>{% elif row.entry %}Yes{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">No running containers to check.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}
