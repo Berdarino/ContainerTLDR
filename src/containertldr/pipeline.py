@@ -9,7 +9,7 @@ from .llm import Ollama, OpenAICompatible, summarise
 from .messages import Rebuild, Update
 from .notes import brief_notes, build_notes
 from .notify import Notifier, NotifyError
-from .registry import Registry, RegistryError
+from .registry import Registry, RegistryError, Unavailable
 from .releases import Release, select_releases
 from .resolve import Upstream, load_mappings, resolve
 from .state import State, state_key
@@ -144,7 +144,13 @@ class Checker:
     def _change(self, group: ImageGroup) -> Change | None:
         """None when there's nothing to report: up to date, or this change has been reported already."""
         key = state_key(group.ref, group.local.id)
-        digest = self.registry.digest(group.image)  # a HEAD, which Docker Hub doesn't count
+        try:
+            digest = self.registry.digest(group.image)  # a HEAD, which Docker Hub doesn't count
+        except Unavailable:
+            if not group.local.built_here:
+                raise  # e.g. a pulled private image without credentials, which the user should hear about
+            log.debug("skipping %s: built on this machine and not in the registry", group.ref)
+            return None
         if digest in group.local.digests:
             self.state.forget(key)
             return None

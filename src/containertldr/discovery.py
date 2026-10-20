@@ -19,6 +19,7 @@ class LocalImage:
     config: dict  # Labels and Env
     created: datetime
     platform: str  # "linux/arm64/v8"
+    built_here: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,7 +87,12 @@ class Docker:
         # parsed names makes "redis" and "docker.io/library/redis" the same.
         digests = frozenset(r.digest for r in map(parse_ref, d.get("RepoDigests") or []) if r.name == name and r.digest)
         platform = "/".join(filter(None, [d["Os"], d["Architecture"], d.get("Variant")]))
-        return LocalImage(image_id, digests, d.get("Config") or {}, datetime.fromisoformat(d["Created"]), platform)
+        # With the containerd image store (Docker 29's default), local builds get a RepoDigest too, so only
+        # Identity tells them apart from pulled images. Older Docker has no Identity at all.
+        identity = d.get("Identity") or {}
+        built_here = bool(identity.get("Build")) and not identity.get("Pull")
+        created = datetime.fromisoformat(d["Created"])
+        return LocalImage(image_id, digests, d.get("Config") or {}, created, platform, built_here)
 
     def _get(self, path: str):
         r = self.http.get(path)

@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from containertldr.registry import Registry, RegistryError, parse_ref, pick_platform
+from containertldr.registry import Registry, RegistryError, Unavailable, parse_ref, pick_platform
 
 HUB = "registry-1.docker.io"
 FIXTURES = Path(__file__).parent / "fixtures" / "registry"  # recorded 2026-10-19
@@ -198,3 +198,37 @@ def test_insecure_registry_over_http():
 def test_errors(responses, error):
     with pytest.raises(RegistryError, match=error):
         Registry(transport=responding(*responses)).digest(RADARR)
+
+
+HUB_CHALLENGE = 'Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:x:pull"'
+
+
+@pytest.mark.parametrize(
+    "ref, responses",
+    [
+        ("registry.lan:5000/myapp:1", [httpx.Response(404)]),
+        # Docker Hub hands out a token for any name, then refuses one it doesn't have
+        (
+            "myapp:latest",
+            [
+                httpx.Response(401, headers={"WWW-Authenticate": HUB_CHALLENGE}),
+                httpx.Response(200, json={"token": "hub"}),
+                httpx.Response(401, headers={"WWW-Authenticate": HUB_CHALLENGE}),
+            ],
+        ),
+        # ghcr.io refuses the token instead
+        (
+            "ghcr.io/someone/myapp:1",
+            [httpx.Response(401, headers={"WWW-Authenticate": GHCR_CHALLENGE}), httpx.Response(403)],
+        ),
+    ],
+)
+def test_images_the_registry_does_not_have_are_unavailable(ref, responses):
+    with pytest.raises(Unavailable):
+        Registry(transport=responding(*responses)).digest(parse_ref(ref))
+
+
+def test_rate_limits_are_not_unavailable():
+    with pytest.raises(RegistryError) as error:
+        Registry(transport=responding(httpx.Response(429))).digest(RADARR)
+    assert not isinstance(error.value, Unavailable)

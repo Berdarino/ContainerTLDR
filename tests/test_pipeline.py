@@ -9,7 +9,7 @@ from containertldr.llm import UNAVAILABLE
 from containertldr.messages import Rebuild
 from containertldr.notify import NotifyError
 from containertldr.pipeline import Checker
-from containertldr.registry import RegistryError, parse_ref
+from containertldr.registry import RegistryError, Unavailable, parse_ref
 from containertldr.releases import Release
 from containertldr.resolve import load_mappings
 from containertldr.state import State, state_key
@@ -24,7 +24,7 @@ def day(d):
     return datetime.fromisoformat(d).replace(tzinfo=UTC)
 
 
-def group(ref, labels=None, env=None, created="2026-09-20", container_labels=None):
+def group(ref, labels=None, env=None, created="2026-09-20", container_labels=None, built_here=False):
     image = parse_ref(ref)
     name = image.name.rsplit("/", 1)[-1]
     local = LocalImage(
@@ -33,6 +33,7 @@ def group(ref, labels=None, env=None, created="2026-09-20", container_labels=Non
         {"Labels": labels or {}, "Env": env or []},
         day(created),
         "linux/amd64",
+        built_here,
     )
     return ImageGroup(ref, image, local, [name], ["stack"], container_labels or {})
 
@@ -220,6 +221,23 @@ def test_one_broken_image_does_not_stop_the_others(tmp_path):
     assert result.updates == 1
     assert result.errors == ["redis: registry-1.docker.io rate limit reached"]
     assert lab.notifier.errors_sent == [result.errors]
+
+
+def test_local_builds_the_registry_does_not_have_are_skipped(tmp_path):
+    hub_refusal = "registry-1.docker.io refused access to library/myapp, private images need credentials"
+    ghcr_refusal = "ghcr.io refused a token for someone/private, check the credentials"
+    lab = Homelab(
+        tmp_path,
+        [group("myapp:latest", built_here=True), group("ghcr.io/someone/private:1")],
+        {"myapp:latest": Unavailable(hub_refusal), "ghcr.io/someone/private:1": Unavailable(ghcr_refusal)},
+    )
+    assert lab.check().errors == [f"private: {ghcr_refusal}"]
+
+
+def test_local_builds_that_were_pushed_are_still_checked(tmp_path):
+    lab = radarr_lab(tmp_path)
+    lab.docker.groups[0] = group(RADARR, {VERSION: "6.4.4.10685-ls318"}, built_here=True)
+    assert lab.check().updates == 1
 
 
 def test_label_mistakes_are_reported(tmp_path):

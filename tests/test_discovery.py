@@ -14,7 +14,7 @@ def container(cid, name, ref, image_id, labels=None):
     return {"Id": cid, "Name": f"/{name}", "Image": image_id, "Config": {"Image": ref, "Labels": labels}}
 
 
-def image(image_id, *repo_digests, arch="amd64", variant=None):
+def image(image_id, *repo_digests, arch="amd64", variant=None, identity=None):
     # Shaped like Docker 29's /images/{id}/json, trimmed to what discovery reads
     return {
         "Id": image_id,
@@ -23,6 +23,7 @@ def image(image_id, *repo_digests, arch="amd64", variant=None):
         "Os": "linux",
         "Architecture": arch,
         "Variant": variant,
+        "Identity": identity,
         "Config": {"Labels": {"org.opencontainers.image.version": "4.0.15.2941-ls290"}, "Env": ["PUID=1000"]},
     }
 
@@ -131,3 +132,16 @@ def test_talks_to_a_socket_proxy_over_tcp():
     Docker("tcp://socket-proxy:2375", transport=engine([], {}, requests)).running()
     assert str(requests[0].url) == "http://socket-proxy:2375/containers/json"
     assert {r.method for r in requests} == {"GET"}
+
+
+@pytest.mark.parametrize(
+    "identity, built_here",
+    [
+        ({"Build": [{"Ref": "y6w884v0xa110l2fiplnk8bbf", "CreatedAt": "2026-10-20T09:48:10+08:00"}]}, True),
+        ({"Pull": [{"Repository": "docker.io/library/redis"}]}, False),
+        (None, False),  # older Docker, or the classic image store
+    ],
+)
+def test_knows_which_images_were_built_here(identity, built_here):
+    img = image(OLD, f"myapp@{OLD_DIGEST}", identity=identity)
+    assert running([container("c1", "myapp", "myapp:latest", OLD)], [img])[0].local.built_here is built_here

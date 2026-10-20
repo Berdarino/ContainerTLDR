@@ -28,6 +28,10 @@ class RegistryError(Exception):
     pass
 
 
+class Unavailable(RegistryError):
+    """The registry doesn't have the image, or won't say whether it does."""
+
+
 @dataclass(frozen=True)
 class ImageRef:
     name: str  # familiar name, as Docker writes it in RepoDigests: "redis", "lscr.io/linuxserver/radarr"
@@ -130,18 +134,18 @@ class Registry:
         query = {k: params[k] for k in ("service", "scope") if k in params}
         query.setdefault("scope", f"repository:{ref.repo}:pull")
         r = self.http.get(params["realm"], params=query, auth=self.credentials.get(ref.host))
-        if r.status_code in (401, 403):
-            raise RegistryError(f"{ref.host} refused a token for {ref.repo}, check the credentials")
+        if r.status_code in (401, 403):  # ghcr.io's answer for a name it doesn't have
+            raise Unavailable(f"{ref.host} refused a token for {ref.repo}, check the credentials")
         r.raise_for_status()
         data = r.json()
         return data.get("token") or data["access_token"]
 
 
 def _check(r: httpx.Response, ref: ImageRef) -> httpx.Response:
-    if r.status_code == 401:
-        raise RegistryError(f"{ref.host} refused access to {ref.repo}, private images need credentials")
+    if r.status_code == 401:  # even with a token: Docker Hub's answer for a name it doesn't have
+        raise Unavailable(f"{ref.host} refused access to {ref.repo}, private images need credentials")
     if r.status_code == 404:
-        raise RegistryError(f"not found on {ref.host}: {r.url.path}")
+        raise Unavailable(f"not found on {ref.host}: {r.url.path}")
     if r.status_code == 429:
         raise RegistryError(f"{ref.host} rate limit reached, credentials raise it on Docker Hub")
     if r.status_code >= 400:
