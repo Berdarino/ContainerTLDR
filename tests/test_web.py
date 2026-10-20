@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import httpx
+import pytest
 from starlette.testclient import TestClient
 
 from containertldr import web
@@ -17,7 +18,7 @@ from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
-from containertldr.web.jobs import Jobs, try_github, try_llm, try_notify
+from containertldr.web.jobs import Failed, Jobs, try_github, try_llm, try_notify, try_summary
 
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
@@ -358,17 +359,23 @@ def test_secrets_are_hidden_in_errors():
     assert finished(jobs).error == "RuntimeError: POST [hidden] failed"
 
 
+def result_page(c):
+    """The test page, once its test has finished."""
+    for _ in range(500):
+        if "This page reloads" not in (page := c.get("/settings/test").text):
+            return page
+        time.sleep(0.01)
+    raise AssertionError("the test didn't finish")
+
+
 def test_testing_docker_from_the_settings_page(tmp_path):
     docker = FakeDocker([group(RADARR), group("redis:8")])
     c = logged_in(tmp_path, docker=docker, env=environment(tmp_path))
     token = csrf(c.get("/settings"))
     response = c.post("/settings/test", data={"csrf": token, "test": "docker"}, follow_redirects=False)
     assert (response.status_code, response.headers["location"]) == (303, "/settings/test")
-    for _ in range(500):
-        if "This page reloads" not in (page := c.get("/settings/test").text):
-            break
-        time.sleep(0.01)
-    assert '<p class="ok">Docker works' in page and "2 running containers to check, on 2 images." in page
+    page = result_page(c)
+    assert '<p class="ok">Docker: OK' in page and "2 running containers to check, on 2 images." in page
     assert c.post("/settings/test", data={"csrf": token, "test": "everything"}).status_code == 400
 
 
@@ -406,6 +413,7 @@ def test_fixing_an_image(tmp_path):
     page = c.get(f"/containers/{APP}")
     assert 'name="repo" value="" placeholder="someone/app"' in page.text  # what the guess would be
     assert "Running in app (<code>ghcr.io/someone/app:latest</code>)." in page.text
+    assert '<button name="container" value="app">app</button>' in page.text  # for a test summary
     token = csrf(page)
     form = {"csrf": token, "repo": "someone/app-server", "version": "env:APP_VERSION", "commits": ""}
     response = c.post(f"/containers/{APP}", data=form, follow_redirects=False)
@@ -433,6 +441,31 @@ def test_labels_win_over_a_fix(tmp_path):
     c = logged_in(tmp_path, docker=FakeDocker([labelled]), env=environment(tmp_path))
     page = c.get(f"/containers/{APP}").text
     assert page.count("wins over this") == 1 and "The label on app wins over this." in page
+
+
+def test_sending_a_test_summary(tmp_path, monkeypatch):
+    class FakeChecker:
+        tested = []
+
+        @classmethod
+        def from_config(cls, config):
+            return cls()
+
+        def test(self, container):
+            self.tested.append(container)
+            if container == "tool":
+                raise ValueError("no GitHub repo known for tool")
+
+    monkeypatch.setattr(web.jobs, "Checker", FakeChecker)
+    config = Config(notify_urls=["x"])
+    assert try_summary(config, "app") == "Sent a [TEST] summary of app's last few releases to the notification targets."
+    with pytest.raises(Failed, match="^no GitHub repo known for tool"):
+        try_summary(config, "tool")
+
+    c = logged_in(tmp_path, docker=FakeDocker([group(f"{APP}:latest")]), env=environment(tmp_path))
+    c.post("/settings/test", data={"csrf": csrf(c.get(f"/containers/{APP}")), "test": "summary", "container": "app"})
+    assert '<p class="ok">Test summary of app: OK' in result_page(c)
+    assert FakeChecker.tested == ["app", "tool", "app"]
 
 
 def test_fixes_need_a_password(tmp_path):

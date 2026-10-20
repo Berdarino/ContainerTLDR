@@ -7,9 +7,10 @@ import httpx
 
 from ..config import Config
 from ..discovery import Docker
-from ..github import GitHub
+from ..github import GitHub, GitHubError
 from ..llm import llm_for, summarise
-from ..notify import Notifier
+from ..notify import Notifier, NotifyError
+from ..pipeline import Checker
 
 # Made up, with one breaking change, to see whether the model finds it
 SAMPLE_NOTES = """\
@@ -89,6 +90,15 @@ def try_llm(config: Config, transport: httpx.BaseTransport | None = None) -> str
     if summary.error:
         raise Failed(f"{config.llm_model} at {config.llm_url} gave no summary: {summary.error}")
     return f"{summary.model} summarised a made-up release:\n\n{summary.text}"
+
+
+def try_summary(config: Config, container: str) -> str:
+    """What --test does: a [TEST] summary of the container's last few releases, sent to the notification targets."""
+    try:
+        Checker.from_config(config).test(container)
+    except (ValueError, GitHubError, NotifyError) as e:  # ours, and written to be read as they are
+        raise Failed(str(e)) from e
+    return f"Sent a [TEST] summary of {container}'s last few releases to the notification targets."
 
 
 def try_github(config: Config, transport: httpx.BaseTransport | None = None) -> str:

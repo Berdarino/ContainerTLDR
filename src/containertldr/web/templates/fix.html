@@ -55,6 +55,18 @@ would do anyway, shown greyed out.</p>
     {% if fix and not problems %}<button name="remove" value="1">Remove the fix</button>{% endif %}
   </p>
 </form>
+{% if groups %}
+<h3>Test summary</h3>
+<p class="muted">Sends a [TEST] summary of the last few releases to your notification targets, read the way the saved
+fix says, so save first. With a model this can take a minute or two.</p>
+<form method="post" action="/settings/test" class="tests">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="test" value="summary">
+  {% for group in groups %}{% for container in group.containers %}
+  <button name="container" value="{{ container }}">{{ container }}</button>
+  {% endfor %}{% endfor %}
+</form>
+{% endif %}
 {% endif %}
 <p><a href="/containers">Back to the containers</a></p>
 {% endblock %}

@@ -28,7 +28,7 @@ from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
 from .fixes import FIELDS, LABEL_NAMES, defaults, fix_from, fix_problems, overridden
-from .jobs import Jobs, secrets_of, try_docker, try_github, try_llm, try_notify
+from .jobs import Jobs, secrets_of, try_docker, try_github, try_llm, try_notify, try_summary
 from .settings import form_rows, problems, updated
 
 log = logging.getLogger(__name__)
@@ -181,12 +181,13 @@ def create_app(
         if request.method == "GET":
             return templates.TemplateResponse(request, "test.html", {"job": jobs.last})
         form = await posted(request)
-        in_use = current()
+        in_use, container = current(), str(form.get("container", ""))
         tests = {
             "notify": ("Notifications", lambda: try_notify(in_use)),
             "llm": ("LLM", lambda: try_llm(in_use)),
             "docker": ("Docker", lambda: try_docker(docker_at(in_use.docker_host), in_use)),
             "github": ("GitHub", lambda: try_github(in_use)),
+            "summary": (f"Test summary of {container}", lambda: try_summary(in_use, container)),
         }
         if (chosen := tests.get(str(form.get("test")))) is None:
             raise HTTPException(400, "There's no such test.")

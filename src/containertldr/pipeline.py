@@ -122,7 +122,7 @@ class Checker:
             raise ValueError(f"no running container called {container}")
         upstream = resolve(group.image, group.labels, group.local.config.get("Labels"), self.mappings, self.fixes)
         if not upstream.repo:
-            raise ValueError(f"no GitHub repo known for {container}, set the containertldr.repo label")
+            raise ValueError(f"no GitHub repo known for {container}, set containertldr.repo or fix it in the web UI")
         stable = [
             r
             for r in self.github.releases(upstream.repo, datetime.now(UTC))
