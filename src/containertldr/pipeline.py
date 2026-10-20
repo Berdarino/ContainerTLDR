@@ -104,8 +104,9 @@ class Checker:
                 elif change.rebuild:
                     rebuilds.append(change)
                 else:
-                    self.notifier.update(self._message(change))
-                    self.state.record(key, change.digest, change.version)  # only once it's been sent
+                    update = self._message(change)
+                    self.notifier.update(update)
+                    self.state.record(key, change.digest, change.version, _sent(update))  # only once it's been sent
                     result.updates += 1
             except Exception as e:  # one broken image must never stop the others
                 log.warning("%s: %s", group.ref, _describe(e), exc_info=log.isEnabledFor(logging.DEBUG))
@@ -203,7 +204,7 @@ class Checker:
 
     def _quietly(self, key: str, digest: str, version: str | None) -> None:
         """Remember a new digest without reporting it: the change it carries was reported already."""
-        self.state.record(key, digest, version)
+        self.state.record(key, digest, version, self.state.entries[key].message)  # it's still the update that's waiting
 
     def _message(self, change: Change) -> Update:
         group, upstream, releases = change.group, change.upstream, change.releases
@@ -256,6 +257,11 @@ class Checker:
         for c in changes:
             self.state.record(state_key(c.group.ref, c.group.local.id), c.digest, c.version)
         result.rebuilds += len(changes)
+
+
+def _sent(update: Update) -> dict:
+    """What the state keeps of a sent update, so the web UI can show what's waiting to be deployed."""
+    return {"title": update.title, "summary": update.summary, "link": update.link, "footer": update.footer}
 
 
 def _describe(e: Exception) -> str:

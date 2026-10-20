@@ -12,6 +12,7 @@ class Entry:
     digest: str  # remote digest last reported
     version: str | None  # what it was reported as: app version, newest release tag, or branch@commit
     at: str
+    message: dict | None = None  # title, summary, link and footer of the update as sent; None if nothing was sent
 
 
 def state_key(ref: str, image_id: str) -> str:
@@ -65,8 +66,8 @@ class State:
         entry = self.entries.get(key)
         return entry is not None and same_version(entry.version, version)
 
-    def record(self, key: str, digest: str, version: str | None) -> None:
-        self.entries[key] = Entry(digest, version, datetime.now(UTC).isoformat(timespec="seconds"))
+    def record(self, key: str, digest: str, version: str | None, message: dict | None = None) -> None:
+        self.entries[key] = Entry(digest, version, datetime.now(UTC).isoformat(timespec="seconds"), message)
         self.save()
 
     def forget(self, key: str) -> None:

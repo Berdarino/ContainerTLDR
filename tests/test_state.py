@@ -94,7 +94,17 @@ def test_sent_errors_are_remembered(tmp_path):
     assert json.loads(path.read_text())["errors"] == ["redis: rate limit reached"]
 
 
+def test_sent_messages_are_kept(tmp_path):
+    path = tmp_path / "state.json"
+    message = {"title": "⬆️ radarr: 6.4.4 → 6.4.5", "summary": "Fixes", "link": None, "footer": "1 release note"}
+    State.load(path).record(KEY, "sha256:r1", "6.4.5", message)
+    assert State.load(path).entries[KEY].message == message
+
+
 def test_files_from_0_1_0_still_load(tmp_path):
     path = tmp_path / "state.json"
-    path.write_text('{"version": 1, "images": {}}')
-    assert State.load(path).errors == set()
+    entry = {"digest": "sha256:r1", "version": "6.4.5", "at": "2026-10-20T04:30:00+00:00"}
+    path.write_text(json.dumps({"version": 1, "images": {KEY: entry}}))
+    state = State.load(path)
+    assert state.errors == set()
+    assert state.entries[KEY].message is None

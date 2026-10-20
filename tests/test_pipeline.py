@@ -170,6 +170,8 @@ def test_update_is_summarised_and_remembered(tmp_path):
     assert update.footer == "Summarised by qwen3:8b from 1 release note"
     key = state_key(RADARR, "sha256:id-radarr")
     assert lab.state.reported(key, "sha256:new")
+    sent = {"title": update.title, "summary": REPLY, "link": update.link, "footer": update.footer}
+    assert lab.state.entries[key].message == sent
 
     # Next run: same image in the registry, so nothing new and no second config fetch
     assert lab.check().updates == 0
@@ -182,7 +184,9 @@ def test_weekly_rebuild_of_a_reported_update_stays_quiet(tmp_path):
     lab.registry.images[RADARR] = remote("sha256:newer", {VERSION: "6.4.5.10720-ls321"})
     result = lab.check()
     assert (result.updates, result.rebuilds, len(lab.notifier.updates)) == (0, 0, 1)
-    assert lab.state.reported(state_key(RADARR, "sha256:id-radarr"), "sha256:newer")
+    entry = lab.state.entries[state_key(RADARR, "sha256:id-radarr")]
+    assert entry.digest == "sha256:newer"
+    assert entry.message["title"] == lab.notifier.updates[0].title  # still waiting to be deployed
     assert lab.github.calls == ["Radarr/Radarr"]  # only the first run needed GitHub
 
 
@@ -197,6 +201,7 @@ def test_first_run_records_a_baseline(tmp_path):
     lab = radarr_lab(tmp_path, first_run=True)
     assert lab.check().baselined == 1
     assert lab.notifier.updates == []
+    assert [e.message for e in lab.state.entries.values()] == [None]
     assert lab.check().updates == 0  # the baselined update isn't reported later either
 
 
