@@ -1,8 +1,11 @@
 import json
 import os
+import socket
+import time
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import httpx
 import pytest
 
 from containertldr import __main__ as cli
@@ -134,6 +137,35 @@ def test_schedule_writes_the_heartbeat_before_waiting(monkeypatch, env):
     due = datetime.fromisoformat(json.loads((env / "heartbeat.json").read_text())["next_check"])
     assert datetime.now(UTC) < due <= datetime.now(UTC) + timedelta(days=1)
     assert cli.healthcheck(env) == 0
+
+
+def test_the_web_ui_only_runs_on_a_schedule_with_a_port(monkeypatch):
+    started = []
+    monkeypatch.setattr(cli, "start_web", lambda config: started.append(config.web_port))
+    monkeypatch.setattr(cli, "follow_schedule", lambda config, dry_run: None)
+    monkeypatch.setattr(cli.signal, "signal", lambda *args: None)
+    cli.main([])
+    monkeypatch.setenv("CTLDR_WEB_PORT", "8080")
+    cli.main(["--once"])
+    cli.main(["--test", "radarr"])
+    assert started == []
+    cli.main([])
+    assert started == [8080]
+
+
+def test_the_web_ui_serves_beside_the_schedule(env):
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = cli.start_web(Config(notify_urls=["x"], data_dir=env, web_host="127.0.0.1", web_port=port))
+    try:
+        for _ in range(500):
+            if server.started:
+                break
+            time.sleep(0.01)
+        assert httpx.get(f"http://127.0.0.1:{port}/").status_code == 200
+    finally:
+        server.should_exit = True
 
 
 def test_healthcheck(env):

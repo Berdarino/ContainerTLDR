@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
@@ -11,11 +12,13 @@ from importlib.metadata import version
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import uvicorn
 from croniter import croniter
 
 from .config import Config, ConfigError, load
 from .notify import Notifier
 from .pipeline import Checker, RunResult
+from .web import create_app
 
 log = logging.getLogger("containertldr")
 
@@ -72,8 +75,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result and not result.errors else 1
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # as PID 1 in a container, SIGTERM is ignored otherwise
+    if config.web_port:
+        start_web(config)
     follow_schedule(config, args.dry_run)
     return 0
+
+
+def start_web(config: Config) -> uvicorn.Server:
+    """Serve the web UI from a thread, so the schedule keeps the main thread and its SIGTERM handling."""
+    # log_config=None keeps our log format; a line per page view would bury the checks' own lines
+    uv_config = uvicorn.Config(
+        create_app(config), host=config.web_host, port=config.web_port, log_config=None, access_log=False
+    )
+    server = uvicorn.Server(uv_config)
+    threading.Thread(target=server.run, name="web", daemon=True).start()
+    return server
 
 
 def check(config: Config, dry_run: bool) -> RunResult | None:
