@@ -74,6 +74,7 @@ def test_bad_settings_stop_startup(monkeypatch, capsys, setting, problem):
     assert problem in capsys.readouterr().err
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root can write to a read-only directory")
 def test_unwritable_data_dir_stops_startup(monkeypatch, capsys, env):
     locked = env / "locked"
     locked.mkdir(mode=0o500)
