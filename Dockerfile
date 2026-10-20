@@ -22,5 +22,7 @@ ENV PATH=/app/.venv/bin:$PATH \
     CTLDR_DATA_DIR=/data \
     DOCKER_CONFIG=/config
 USER containertldr
+# The web UI, which only listens when CTLDR_WEB_PORT=8080 is set
+EXPOSE 8080
 HEALTHCHECK --interval=5m --start-period=30s CMD ["containertldr", "healthcheck"]
 ENTRYPOINT ["containertldr"]

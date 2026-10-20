@@ -93,6 +93,8 @@ Everything is set with environment variables.
 | `CTLDR_INSECURE_REGISTRIES` | | Registries to reach over plain http, comma-separated |
 | `CTLDR_DATA_DIR` | `/data` | Where it keeps what it has reported |
 | `CTLDR_LOG_LEVEL` | `info` | `debug`, `info`, `warning` or `error` |
+| `CTLDR_WEB_PORT` | | Turns on the [web UI](#web-ui) on this port. Without it, nothing listens |
+| `CTLDR_WEB_HOST` | `0.0.0.0` | The address the web UI listens on |
 
 `CTLDR_NOTIFY_URLS`, `CTLDR_LLM_API_KEY` and `GITHUB_TOKEN` also work with a `_FILE` suffix pointing at a file,
 for Docker secrets.
@@ -124,7 +126,23 @@ services:
 
 Without a label, the repo comes from a short list of built-in defaults for popular images whose own labels point
 at the wrong place (LinuxServer's, for example), then from the image's `org.opencontainers.image.source` label,
-then from its `ghcr.io/owner/name` path. When the repo was guessed, the notification says so.
+then from its `ghcr.io/owner/name` path. When the repo was guessed, the notification says so, and the
+[web UI](#web-ui) highlights it.
+
+## Web UI
+
+Set `CTLDR_WEB_PORT` and publish that port (see the commented lines in the example compose file) for a small
+read-only web UI:
+
+- Status: when the last check ran, what it found and its errors, when the next one is due, and the updates that
+  were reported but aren't deployed yet, with their summaries.
+- Containers: how the next check will read each running image: where its release notes come from and how that was
+  found, its version, and the `containertldr.*` labels in effect. Rows where the repo was guessed, or where no
+  repo or version was found, are highlighted. Those probably need a label.
+
+The pages only read the Docker API and what the checks saved, so opening them costs no registry or GitHub rate
+limit. There's no login, so keep the port on your LAN, or put it behind your reverse proxy's authentication if
+it's reachable from further away.
 
 ## Models
 
@@ -148,9 +166,10 @@ but read.
 
 ## Security
 
-ContainerTLDR only reads from Docker, only makes outbound requests and never logs secrets. Release notes are
-treated as untrusted text: the model has no tools, can't ping anyone, and its verdict is checked against the
-breaking changes it lists. See [SECURITY.md](SECURITY.md) for the details and how to report a problem.
+ContainerTLDR only reads from Docker, listens on no port unless you turn on the [web UI](#web-ui), and never logs
+secrets. Release notes are treated as untrusted text: the model has no tools, can't ping anyone, and its verdict is
+checked against the breaking changes it lists. See [SECURITY.md](SECURITY.md) for the details and how to report a
+problem.
 
 ## Limitations
 

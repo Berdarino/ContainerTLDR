@@ -11,7 +11,10 @@ Please report security problems privately through GitHub: open the Security tab 
   with `POST=0`, as in [examples/docker-compose.yml](examples/docker-compose.yml), so it couldn't do more even if
   it tried.
 - It only makes outbound requests: to container registries, the GitHub API, your LLM and your notification
-  services. It doesn't listen on any port.
+  services. It doesn't listen on any port unless `CTLDR_WEB_PORT` is set.
+- The web UI that `CTLDR_WEB_PORT` turns on is read-only and has no login. It shows container names, image
+  references and update summaries, but no settings or secrets. Keep it on your LAN, or put it behind your reverse
+  proxy's authentication if it's reachable from further away.
 - It runs as a non-root user and only writes to `/data`, so a read-only root filesystem works.
 - Secrets (notification URLs, `GITHUB_TOKEN`, the LLM API key, registry logins) are never logged. The settings
   printed at startup leave them out, and notification URLs in log messages are cut down to their scheme and host.
@@ -30,6 +33,7 @@ ContainerTLDR gives third-party release notes to an LLM, so a release note could
   `@channel` are broken up for other services.
 - The verdict is checked against the "Breaking / action needed" line in code, so a model that says "Safe to
   update" while a breaking change is listed gets overruled.
+- The web UI shows summaries as plain text, so HTML in a release note or in the model's reply is never rendered.
 
 The worst a malicious release note can do is make its own summary wrong. For updates that matter, read the linked
 release notes too.
