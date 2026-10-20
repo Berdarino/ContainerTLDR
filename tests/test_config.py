@@ -4,7 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from containertldr.config import Config, ConfigError, load, read_settings, registry_credentials, split_urls
+from containertldr.config import (
+    Config,
+    ConfigError,
+    load,
+    read_fixes,
+    read_settings,
+    registry_credentials,
+    split_urls,
+    write_settings,
+)
 
 DISCORD = "discord://123/AbC-token"
 
@@ -125,6 +134,14 @@ def test_read_settings(tmp_path):
     (tmp_path / "settings.json").write_text("{")
     with pytest.raises(ConfigError, match="can't read .*settings.json"):
         read_settings(tmp_path)
+
+
+def test_settings_and_fixes_share_the_file(tmp_path):
+    (tmp_path / "settings.json").write_text(json.dumps({"version": 1, "images": {"redis": {"version": "none"}}}))
+    assert read_settings(tmp_path) == {}
+    write_settings(tmp_path, {"llm_model": "llama3.2"})
+    assert read_fixes(tmp_path) == {"redis": {"version": "none"}}
+    assert read_settings(tmp_path) == {"llm_model": "llama3.2"}
 
 
 def test_repr_hides_secrets(tmp_path):

@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from .config import Config
+from .config import Config, read_fixes
 from .discovery import Docker, ImageGroup
 from .github import GitHub, GitHubError
 from .llm import Ollama, OpenAICompatible, llm_for, summarise
@@ -57,6 +57,7 @@ class Checker:
         notifier: Notifier,
         state: State,
         mappings: dict[str, dict],
+        fixes: dict[str, dict] | None = None,
     ):
         self.config = config
         self.docker = docker
@@ -66,6 +67,7 @@ class Checker:
         self.notifier = notifier
         self.state = state
         self.mappings = mappings
+        self.fixes = fixes or {}  # saved in the web UI
 
     @classmethod
     def from_config(cls, config: Config, dry_run: bool = False) -> "Checker":
@@ -78,6 +80,7 @@ class Checker:
             Notifier(config.notify_urls, dry_run=dry_run),
             State.load(config.data_dir / "state.json", readonly=dry_run),
             load_mappings(),
+            read_fixes(config.data_dir),
         )
 
     def run(self) -> RunResult:
@@ -117,7 +120,7 @@ class Checker:
         group = next((g for g in self.docker.running() if container in g.containers), None)
         if group is None:
             raise ValueError(f"no running container called {container}")
-        upstream = resolve(group.image, group.labels, group.local.config.get("Labels"), self.mappings)
+        upstream = resolve(group.image, group.labels, group.local.config.get("Labels"), self.mappings, self.fixes)
         if not upstream.repo:
             raise ValueError(f"no GitHub repo known for {container}, set the containertldr.repo label")
         stable = [
@@ -151,7 +154,7 @@ class Checker:
 
         remote = self.registry.config(group.image, digest, group.local.platform)
         remote_config = remote.get("config") or {}
-        upstream = resolve(group.image, group.labels, remote_config.get("Labels"), self.mappings)
+        upstream = resolve(group.image, group.labels, remote_config.get("Labels"), self.mappings, self.fixes)
         current, new = read_version(group.local.config, upstream.version), read_version(remote_config, upstream.version)
         cur_v, new_v = parse_version(current), parse_version(new)
         since, until = group.local.created, datetime.fromisoformat(remote["created"])

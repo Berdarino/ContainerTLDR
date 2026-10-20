@@ -116,21 +116,36 @@ def data_dir(env: Mapping[str, str] = os.environ) -> Path:
 
 def read_settings(data_dir: Path) -> dict[str, str]:
     """What was saved on the web UI's settings page, as the strings the environment variables would hold."""
-    path = data_dir / SETTINGS
-    try:
-        return json.loads(path.read_text())["settings"]
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError, KeyError) as e:
-        raise ConfigError(f"can't read {path}: {e}") from e
+    return _saved(data_dir).get("settings", {})
+
+
+def read_fixes(data_dir: Path) -> dict[str, dict[str, str]]:
+    """How images should be read, saved in the web UI, by image_key(): the containertldr.* label fields."""
+    return _saved(data_dir).get("images", {})
 
 
 def write_settings(data_dir: Path, settings: Mapping[str, str]) -> None:
-    """Replaces the file in one go, readable by its owner only, since it can hold webhook URLs and tokens."""
+    _write(data_dir, settings=dict(sorted(settings.items())))
+
+
+def _saved(data_dir: Path) -> dict:
+    path = data_dir / SETTINGS
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        raise ConfigError(f"can't read {path}: {e}") from e
+
+
+def _write(data_dir: Path, **sections: dict) -> None:
+    """Replaces one part of the file and keeps the rest. In one go, and readable by its owner only, since it can
+    hold webhook URLs and tokens."""
     path, tmp = data_dir / SETTINGS, data_dir / (SETTINGS + ".tmp")
+    data = {"version": 1, **_saved(data_dir), **sections}
     tmp.unlink(missing_ok=True)  # so the mode below applies
     with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
-        f.write(json.dumps({"version": 1, "settings": dict(sorted(settings.items()))}, indent=2) + "\n")
+        f.write(json.dumps(data, indent=2) + "\n")
     os.replace(tmp, path)
 
 

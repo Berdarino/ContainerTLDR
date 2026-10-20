@@ -134,6 +134,7 @@ class Homelab:
         self.llm = FakeLLM(llm) if llm is not None else None
         self.notifier = FakeNotifier()
         self.config = Config(notify_urls=["discord://1/a"], **config)
+        self.fixes = {}
 
     def checker(self):
         args = (
@@ -144,6 +145,7 @@ class Homelab:
             self.notifier,
             State.load(self.path),
             load_mappings(),
+            self.fixes,
         )
         return Checker(self.config, *args)
 
@@ -349,6 +351,23 @@ def test_unknown_versions_go_by_build_dates(tmp_path):
     assert update.title == "⬆️ app: latest built 2026-09-20 → latest built 2026-10-15"
     assert update.footer.endswith(" · repo someone/app guessed from the ghcr path")
     assert lab.state.entries[state_key(app, "sha256:id-app")].version == "v2.1.0"
+
+
+def test_a_fix_saved_in_the_web_ui_is_used(tmp_path):
+    app = "ghcr.io/someone/app:latest"
+    url = "https://github.com/someone/app-server/releases/v2.1.0"
+    releases = {"someone/app-server": [Release("v2.1.0", day("2026-10-01"), NOTES, url)]}
+    lab = Homelab(tmp_path, [group(app)], {app: remote("sha256:new")}, releases)
+    lab.fixes = {"ghcr.io/someone/app": {"repo": "someone/app-server"}}
+    lab.check()
+    assert lab.github.calls == ["someone/app-server"]
+    assert "guessed" not in lab.notifier.updates[0].footer
+
+
+def test_checks_read_the_fixes(tmp_path):
+    (tmp_path / "settings.json").write_text('{"version": 1, "images": {"redis": {"version": "none"}}}')
+    checker = Checker.from_config(Config(notify_urls=["discord://1/a"], data_dir=tmp_path))
+    assert checker.fixes == {"redis": {"version": "none"}}
 
 
 def test_unknown_versions_and_no_releases_is_a_rebuild(tmp_path):
