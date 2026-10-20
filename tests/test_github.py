@@ -124,6 +124,21 @@ def test_unknown_repo():
         gh.releases("nobody/nothing", SINCE)
 
 
+def test_rate_limit():
+    requests = []
+    core = {"limit": 5000, "remaining": 4987, "reset": 1792483200, "used": 13}
+    answer = httpx.Response(200, json={"resources": {"core": core}})
+    gh = GitHub("ghp_test", transport=responding(answer, requests=requests))
+    assert gh.rate_limit() == (5000, 4987)
+    assert requests[0].url.path == "/rate_limit"
+
+
+def test_a_token_github_refuses():
+    gh = GitHub("ghp_revoked", transport=responding(httpx.Response(401, json={"message": "Bad credentials"})))
+    with pytest.raises(GitHubError, match="GitHub refused the token, check GITHUB_TOKEN"):
+        gh.rate_limit()
+
+
 def test_compare_as_one_release():
     data = json.loads((FIXTURES / "caddy_tailscale_compare.json").read_text())
     base, head = "6911d07a13eca7605ea1c0ec985d858cf2408393", "de41b249af4fd2083612c3b2303197e92787d1c5"

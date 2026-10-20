@@ -62,6 +62,11 @@ class GitHub:
         published = datetime.fromisoformat(commits[-1]["commit"]["committer"]["date"]) if commits else datetime.now(UTC)
         return Release(f"{base[:7]}...{head[:7]}", published, body, data["html_url"])
 
+    def rate_limit(self) -> tuple[int, int]:
+        """The hourly limit and what's left of it. Asking doesn't count against it."""
+        core = self._get("/rate_limit").json()["resources"]["core"]
+        return core["limit"], core["remaining"]
+
     def _get(self, url: str) -> httpx.Response:
         if self.limited_until and datetime.now(UTC) < self.limited_until:
             raise GitHubError(_limit_message(self.limited_until))
@@ -77,6 +82,8 @@ class GitHub:
                 raise GitHubError(_limit_message(self.limited_until))
         if r.status_code in (403, 429):
             raise GitHubError(f"GitHub refused {url}: {r.text[:200]}")
+        if r.status_code == 401:
+            raise GitHubError("GitHub refused the token, check GITHUB_TOKEN")
         if r.status_code == 404:
             raise GitHubError(f"not found on GitHub: {url}")
         r.raise_for_status()

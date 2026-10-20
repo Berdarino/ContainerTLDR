@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block head %}{% if job and not job.done %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block title %}Test{% endblock %}
+{% block main %}
+<h2>Test</h2>
+{% if not job %}
+<p class="muted">Nothing has been tested yet.</p>
+{% elif not job.done %}
+<p>Testing {{ job.title }}. This page reloads until it's done.</p>
+{% elif job.error %}
+<p class="errors">{{ job.title }} failed after {{ "%.1f" | format(job.took) }} s:</p>
+<div class="summary errors">{{ job.error }}</div>
+{% else %}
+<p class="ok">{{ job.title }} works ({{ "%.1f" | format(job.took) }} s).</p>
+<div class="summary">{{ job.result }}</div>
+{% endif %}
+<p><a href="/settings">Back to the settings</a></p>
+{% endblock %}

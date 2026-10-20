@@ -1,6 +1,8 @@
 import html
 import json
 import re
+import threading
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -14,6 +16,7 @@ from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
+from containertldr.web.jobs import Jobs, try_github
 
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
@@ -246,6 +249,7 @@ def test_settings_need_a_password_first(tmp_path):
     assert "ollama.lan" not in page
     c.post("/settings", data={"llm_model": "llama3.2"})
     assert read_settings(tmp_path) == {}
+    assert c.get("/settings/test").status_code == 404
 
 
 def test_the_settings_form(tmp_path):
@@ -314,6 +318,54 @@ def test_pages_go_by_the_settings_in_use(tmp_path):
     c.get("/containers")
     assert hosts == ["tcp://socket-proxy:2375"]  # one client, kept while the host stays the same
     assert docker.filters == [("tldr", None), ("tldr", None)]
+
+
+def finished(jobs):
+    for _ in range(500):
+        if jobs.last.done:
+            return jobs.last
+        time.sleep(0.01)
+    raise AssertionError("the test didn't finish")
+
+
+def test_one_test_at_a_time():
+    jobs, go = Jobs(), threading.Event()
+    jobs.start("Slow", lambda: "done" if go.wait(5) else "timed out", secrets=[])
+    jobs.start("Impatient", lambda: "ran", secrets=[])
+    assert (jobs.last.title, jobs.last.done) == ("Slow", False)
+    go.set()
+    assert finished(jobs).result == "done"
+
+
+def test_secrets_are_hidden_in_errors():
+    webhook = "https://discord.com/api/webhooks/123/AbC-token"
+
+    def leaky():
+        raise RuntimeError(f"POST {webhook} failed")
+
+    jobs = Jobs()
+    jobs.start("Notifications", leaky, secrets=[webhook])
+    assert finished(jobs).error == "RuntimeError: POST [hidden] failed"
+
+
+def test_testing_docker_from_the_settings_page(tmp_path):
+    docker = FakeDocker([group(RADARR), group("redis:8")])
+    c = logged_in(tmp_path, docker=docker, env=environment(tmp_path))
+    token = csrf(c.get("/settings"))
+    response = c.post("/settings/test", data={"csrf": token, "test": "docker"}, follow_redirects=False)
+    assert (response.status_code, response.headers["location"]) == (303, "/settings/test")
+    for _ in range(500):
+        if "This page reloads" not in (page := c.get("/settings/test").text):
+            break
+        time.sleep(0.01)
+    assert '<p class="ok">Docker works' in page and "2 running containers to check, on 2 images." in page
+    assert c.post("/settings/test", data={"csrf": token, "test": "everything"}).status_code == 400
+
+
+def test_testing_the_github_token():
+    core = {"limit": 60, "remaining": 59}
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"resources": {"core": core}}))
+    assert try_github(Config(notify_urls=["x"]), transport) == "59 of 60 requests left this hour, without a token."
 
 
 def test_broken_saved_settings_are_shown(tmp_path):

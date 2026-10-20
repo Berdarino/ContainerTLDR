@@ -59,5 +59,13 @@ changed there. An empty field means the default. Changes apply from the next che
   {% endfor %}
   <p><button>Save</button></p>
 </form>
+
+<h3>Test</h3>
+<p class="muted">Tests use the saved settings, so save your changes first.</p>
+<form method="post" action="/settings/test" class="tests">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button name="test" value="docker">Docker</button>
+  <button name="test" value="github">GitHub</button>
+</form>
 {% endif %}
 {% endblock %}

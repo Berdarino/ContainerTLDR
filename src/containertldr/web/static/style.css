@@ -141,6 +141,10 @@ main > h3 {
   color: var(--ok);
 }
 
+.tests button {
+  margin-right: 0.5rem;
+}
+
 .summary {
   white-space: pre-wrap;
   margin-top: 0.5rem;

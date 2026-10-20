@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from starlette.applications import Starlette
+from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
@@ -24,6 +25,7 @@ from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
+from .jobs import Jobs, secrets_of, try_docker, try_github
 from .settings import form_rows, problems, updated
 
 log = logging.getLogger(__name__)
@@ -74,6 +76,11 @@ def create_app(
         except ConfigError:  # the settings page shows what's wrong
             return config
 
+    def docker_at(host: str) -> Docker:
+        if host not in clients:
+            clients[host] = docker(host)
+        return clients[host]
+
     def status(request: Request) -> Response:
         in_use = current()
         entries = State.load(config.data_dir / "state.json", readonly=True).entries.values()
@@ -88,11 +95,9 @@ def create_app(
 
     def containers(request: Request) -> Response:
         in_use = current()
-        if in_use.docker_host not in clients:
-            clients[in_use.docker_host] = docker(in_use.docker_host)
         # Only the Docker API: registry and GitHub calls would cost rate limit on every page load
         try:
-            groups = clients[in_use.docker_host].running(in_use.include_label, in_use.exclude_label)
+            groups = docker_at(in_use.docker_host).running(in_use.include_label, in_use.exclude_label)
         except httpx.HTTPError as e:
             error = f"Can't reach Docker at {in_use.docker_host}: {e}"
             return templates.TemplateResponse(request, "containers.html", {"error": error})
@@ -121,6 +126,22 @@ def create_app(
         placed = {row.problem for group in groups.values() for row in group}
         context |= {"groups": groups, "other_problems": [p for p in found if p not in placed]}
         return templates.TemplateResponse(request, "settings.html", context, status_code=status_code)
+
+    jobs = Jobs()
+
+    async def testing(request: Request) -> Response:
+        if request.method == "GET":
+            return templates.TemplateResponse(request, "test.html", {"job": jobs.last})
+        form = await posted(request)
+        in_use = current()
+        tests = {
+            "docker": ("Docker", lambda: try_docker(docker_at(in_use.docker_host), in_use)),
+            "github": ("GitHub", lambda: try_github(in_use)),
+        }
+        if (chosen := tests.get(str(form.get("test")))) is None:
+            raise HTTPException(400, "There's no such test.")
+        jobs.start(*chosen, secrets=secrets_of(in_use))
+        return RedirectResponse("/settings/test", status_code=303)
 
     attempts, failures = asyncio.Lock(), 0
 
@@ -153,7 +174,11 @@ def create_app(
     ]
     if not config.web_password:
         return Starlette(routes=routes)
-    routes += [Route("/login", login, methods=["GET", "POST"]), Route("/logout", logout, methods=["POST"])]
+    routes += [
+        Route("/settings/test", testing, methods=["GET", "POST"]),
+        Route("/login", login, methods=["GET", "POST"]),
+        Route("/logout", logout, methods=["POST"]),
+    ]
     key = session_key(config.data_dir, config.web_password)
     # A cookie name of its own: cookies are shared by every app on the same host, whatever the port
     session = Middleware(SessionMiddleware, secret_key=key, session_cookie="containertldr", same_site="strict")
