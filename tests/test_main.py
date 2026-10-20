@@ -9,17 +9,19 @@ import httpx
 import pytest
 
 from containertldr import __main__ as cli
-from containertldr.config import Config
+from containertldr.config import Config, load
 from containertldr.pipeline import RunResult
 
 
 class FakeChecker:
     result: RunResult | Exception = RunResult()
     calls: list = []
+    config: Config | None = None
 
     @classmethod
     def from_config(cls, config, dry_run=False):
         cls.calls.append(("from_config", dry_run))
+        cls.config = config
         return cls()
 
     def run(self):
@@ -137,6 +139,56 @@ def test_schedule_writes_the_heartbeat_before_waiting(monkeypatch, env):
     due = datetime.fromisoformat(json.loads((env / "heartbeat.json").read_text())["next_check"])
     assert datetime.now(UTC) < due <= datetime.now(UTC) + timedelta(days=1)
     assert cli.healthcheck(env) == 0
+
+
+def save(data_dir, **settings):
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "settings.json").write_text(json.dumps({"version": 1, "settings": settings}))
+
+
+def test_saved_settings_are_read_at_startup(monkeypatch, env):
+    monkeypatch.delenv("CTLDR_NOTIFY_URLS")
+    save(env / "data", notify_urls="discord://123/AbC-token", llm_model="llama3.2")
+    assert cli.main(["--once"]) == 0
+    assert FakeChecker.config.llm_model == "llama3.2"
+
+
+def test_a_schedule_saved_while_waiting_moves_the_next_check(monkeypatch, env):
+    naps = []
+
+    def nap(seconds):
+        naps.append(seconds)
+        if len(naps) == 2:
+            raise KeyboardInterrupt
+        save(env / "data", schedule="*/5 * * * *")
+
+    monkeypatch.setattr(cli.time, "sleep", nap)
+    (env / "data").mkdir()
+    with pytest.raises(KeyboardInterrupt):
+        cli.follow_schedule(load(os.environ), dry_run=False)
+    due = datetime.fromisoformat(json.loads((env / "data" / "heartbeat.json").read_text())["next_check"])
+    assert due <= datetime.now(UTC) + timedelta(minutes=5)
+    assert FakeChecker.calls == []  # a new schedule isn't a reason to check straight away
+
+
+def test_saved_settings_reach_the_next_check(monkeypatch, env):
+    config = load(os.environ)
+    save(env / "data", llm_model="llama3.2")
+    monkeypatch.setattr(cli, "next_check", lambda config, after: datetime.now(UTC))
+
+    def check(config, dry_run):
+        raise KeyboardInterrupt(config.llm_model)
+
+    monkeypatch.setattr(cli, "check", check)
+    with pytest.raises(KeyboardInterrupt, match="llama3.2"):
+        cli.follow_schedule(config, dry_run=False)
+
+
+def test_broken_saved_settings_keep_the_ones_in_use(env, caplog):
+    config = Config(notify_urls=["x"], data_dir=env)
+    (env / "settings.json").write_text("{")
+    assert cli.reload(config) is config
+    assert "keeping the settings in use" in caplog.text
 
 
 def test_the_web_ui_only_runs_on_a_schedule_with_a_port(monkeypatch):

@@ -102,7 +102,7 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
         exclude_label=read.text("EXCLUDE_LABEL"),
         insecure_registries=[h.strip() for h in read.text("INSECURE_REGISTRIES", "").split(",") if h.strip()],
         registry_credentials=credentials,
-        data_dir=Path(read.text("DATA_DIR", "/data")),
+        data_dir=data_dir(env),
         log_level=read.choice("LOG_LEVEL", "info", LOG_LEVELS),
         web_port=web_port,
         web_host=read.text("WEB_HOST", "0.0.0.0"),
@@ -110,6 +110,11 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
     if read.problems:
         raise ConfigError("\n".join(read.problems))
     return config
+
+
+def data_dir(env: Mapping[str, str] = os.environ) -> Path:
+    """Where the state and the saved settings are, so it has to be known before the settings are read."""
+    return Path(env.get(PREFIX + "DATA_DIR") or "/data")
 
 
 def read_settings(data_dir: Path) -> dict[str, str]:

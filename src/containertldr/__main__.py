@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import uvicorn
 from croniter import croniter
 
-from .config import Config, ConfigError, load
+from .config import SETTINGS, Config, ConfigError, data_dir, load, read_settings
 from .notify import Notifier
 from .pipeline import Checker, RunResult
 from .web import create_app
@@ -40,10 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "healthcheck":
-        return healthcheck(Path(os.environ.get("CTLDR_DATA_DIR", "/data")))
+        return healthcheck(data_dir())
 
     try:
-        config = load()
+        config = load(os.environ, read_settings(data_dir()))
     except ConfigError as e:
         print(f"containertldr can't start:\n{e}", file=sys.stderr)
         return 2
@@ -119,14 +119,42 @@ def check(config: Config, dry_run: bool) -> RunResult | None:
 
 
 def follow_schedule(config: Config, dry_run: bool) -> None:
-    tz = ZoneInfo(config.tz)
     while True:
-        due = next_check(config, datetime.now(tz))
+        due = next_check(config, datetime.now(ZoneInfo(config.tz)))
         write_heartbeat(config.data_dir, due)
         log.info("next check at %s", due.strftime("%Y-%m-%d %H:%M %Z"))
-        while (wait := (due - datetime.now(tz)).total_seconds()) > 0:
-            time.sleep(min(wait, 60))  # short naps, so a host that was suspended doesn't oversleep
-        check(config, dry_run)
+        on_time = sleep_until(due, config.data_dir)
+        config = reload(config)
+        if on_time:
+            check(config, dry_run)
+
+
+def sleep_until(due: datetime, data_dir: Path) -> bool:
+    """False if settings were saved in the meantime, since they may hold a new schedule."""
+    saved = _saved_at(data_dir)
+    while (wait := (due - datetime.now(UTC)).total_seconds()) > 0:
+        time.sleep(min(wait, 60))  # short naps, so a host that was suspended doesn't oversleep
+        if _saved_at(data_dir) != saved:
+            return False
+    return True
+
+
+def reload(config: Config) -> Config:
+    """The settings as they are now, so what was saved in the web UI applies without a restart."""
+    try:
+        fresh = load(os.environ, read_settings(config.data_dir))
+    except ConfigError as e:
+        log.error("keeping the settings in use, the new ones have a problem:\n%s", e)
+        return config
+    logging.getLogger().setLevel(fresh.log_level.upper())
+    return fresh
+
+
+def _saved_at(data_dir: Path) -> int | None:
+    try:
+        return (data_dir / SETTINGS).stat().st_mtime_ns
+    except FileNotFoundError:
+        return None
 
 
 def next_check(config: Config, after: datetime) -> datetime:
