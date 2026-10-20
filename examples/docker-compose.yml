@@ -1,0 +1,42 @@
+# ContainerTLDR behind a read-only Docker socket proxy.
+#
+# The proxy only allows reading containers and images (POST=0), and it sits on an internal network, so
+# ContainerTLDR never touches the Docker socket itself. ContainerTLDR also joins the default network,
+# because it needs to reach the registries, GitHub, your LLM and your notification service.
+
+services:
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [internal]
+    restart: unless-stopped
+
+  containertldr:
+    image: ghcr.io/berdarino/containertldr:latest
+    environment:
+      CTLDR_DOCKER_HOST: tcp://socket-proxy:2375
+      CTLDR_NOTIFY_URLS: discord://<webhook_id>/<webhook_token>
+      CTLDR_LLM_URL: http://ollama:11434  # wherever your Ollama runs
+      CTLDR_LLM_MODEL: qwen3:8b
+      TZ: Europe/London
+      # GITHUB_TOKEN: ghp_...  # optional, raises GitHub's limit from 60 to 5000 requests an hour
+    volumes:
+      - containertldr-data:/data
+      # For private images, mount your Docker logins (credential helpers aren't supported):
+      # - ~/.docker/config.json:/config/config.json:ro
+    networks: [internal, default]
+    read_only: true
+    restart: unless-stopped
+    depends_on: [socket-proxy]
+
+volumes:
+  containertldr-data:
+
+networks:
+  internal:
+    internal: true
