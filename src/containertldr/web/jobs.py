@@ -65,7 +65,8 @@ def _run(job: Job, work: Callable[[], str], secrets: list[str]) -> None:
 
 
 def secrets_of(config: Config) -> list[str]:
-    return [s for s in (*config.notify_urls, config.llm_api_key, config.github_token, config.web_password) if s]
+    found = (*config.notify_urls, config.llm_api_key, config.github_token, config.web_password, config.webhook_token)
+    return [s for s in found if s]
 
 
 def try_docker(docker: Docker, config: Config) -> str:

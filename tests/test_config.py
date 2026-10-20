@@ -122,9 +122,16 @@ def test_saved_settings_are_checked_the_same_way(tmp_path):
 
 
 def test_some_settings_only_come_from_the_environment(tmp_path):
-    saved = {"data_dir": "/elsewhere", "web_port": "1", "web_host": "127.0.0.1", "web_password": "saved"}
+    saved = {
+        "data_dir": "/elsewhere",
+        "web_port": "1",
+        "web_host": "127.0.0.1",
+        "web_password": "pw",
+        "webhook_token": "t",
+    }
     c = config(tmp_path, saved, CTLDR_NOTIFY_URLS=DISCORD)
-    assert (c.data_dir, c.web_port, c.web_host, c.web_password) == (Path("/data"), None, "0.0.0.0", None)
+    assert (c.data_dir, c.web_port, c.web_host) == (Path("/data"), None, "0.0.0.0")
+    assert (c.web_password, c.webhook_token) == (None, None)
 
 
 def test_read_settings(tmp_path):
@@ -145,7 +152,12 @@ def test_settings_and_fixes_share_the_file(tmp_path):
 
 
 def test_repr_hides_secrets(tmp_path):
-    secrets = {"GITHUB_TOKEN": "ghp_secret", "CTLDR_LLM_API_KEY": "sk-secret", "CTLDR_WEB_PASSWORD": "pw-secret"}
+    secrets = {
+        "GITHUB_TOKEN": "ghp_secret",
+        "CTLDR_LLM_API_KEY": "sk-secret",
+        "CTLDR_WEB_PASSWORD": "pw-secret",
+        "CTLDR_WEBHOOK_TOKEN": "hook-secret",
+    }
     c = config(tmp_path, CTLDR_NOTIFY_URLS=DISCORD, **secrets)
     assert not any(secret in repr(c) for secret in ("AbC-token", *secrets.values()))
 

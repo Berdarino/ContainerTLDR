@@ -23,12 +23,14 @@ from starlette.templating import Jinja2Templates
 from ..config import Config, ConfigError, load, read_fixes, read_settings, write_fixes, write_settings
 from ..discovery import Docker, ImageGroup
 from ..heartbeat import overdue
+from ..pipeline import CHECKING, Checker
 from ..registry import ImageRef, parse_ref
 from ..resolve import GUESSES, Upstream, image_key, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
-from .auth import RequireLogin, page_context, posted, same_password, session_key
+from .auth import RequireLogin, page_context, posted, same_password, sent_token, session_key
 from .fixes import FIELDS, LABEL_NAMES, defaults, fix_from, fix_problems, overridden
+from .hooks import SENDERS, Hooks
 from .jobs import Jobs, secrets_of, try_docker, try_github, try_llm, try_notify, try_summary
 from .markdown import markdown
 from .settings import form_rows, problems, updated
@@ -68,7 +70,10 @@ class Row:
 
 
 def create_app(
-    config: Config, docker: Callable[[str], Docker] = Docker, env: Mapping[str, str] = os.environ
+    config: Config,
+    docker: Callable[[str], Docker] = Docker,
+    env: Mapping[str, str] = os.environ,
+    dry_run: bool = False,
 ) -> Starlette:
     """The web UI. It reads what the scheduled checks leave in the data dir, so a page never waits for a check.
 
@@ -183,6 +188,28 @@ def create_app(
         }
         return templates.TemplateResponse(request, "fix.html", context, status_code=status_code)
 
+    def check_one(image: str) -> None:
+        with CHECKING:
+            result = Checker.from_config(current(), dry_run).run(image)
+        counts = f"{result.updates} update(s), {result.rebuilds} rebuild(s), {len(result.errors)} error(s)"
+        log.info("webhook check of %s: %s", image, counts)
+
+    hooks = Hooks(check_one) if config.webhook_token else None
+
+    async def hook(request: Request) -> Response:
+        if not hooks or not same_password(sent_token(request), config.webhook_token or ""):
+            return PlainTextResponse("Wrong or missing token.", status_code=401)
+        if (read := SENDERS.get(request.path_params["sender"])) is None:
+            raise HTTPException(404)
+        try:
+            images = read(await request.json())
+        except ValueError as e:  # not JSON, or not what this sender sends
+            return PlainTextResponse(str(e), status_code=400)
+        for image in images:
+            hooks.add(image)
+        log.info("webhook from %s: checking %s", request.path_params["sender"], ", ".join(images))
+        return PlainTextResponse(f"Checking {', '.join(images)}.", status_code=202)
+
     jobs = Jobs()
 
     async def testing(request: Request) -> Response:
@@ -232,6 +259,8 @@ def create_app(
         Route("/health", health),
         Mount("/static", static),
     ]
+    if hooks:
+        routes.append(Route("/hooks/{sender}", hook, methods=["POST"]))
     if not config.web_password:
         return Starlette(routes=routes)
     routes += [

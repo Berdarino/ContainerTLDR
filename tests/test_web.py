@@ -18,6 +18,7 @@ from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
+from containertldr.web.hooks import Hooks
 from containertldr.web.jobs import Failed, Jobs, try_github, try_llm, try_notify, try_summary
 from containertldr.web.markdown import markdown
 
@@ -194,6 +195,74 @@ def test_health_for_uptime_monitors(tmp_path):
     assert (c.get("/health").status_code, c.get("/health").text) == (200, "ok")
     write_heartbeat(tmp_path, datetime.now(UTC) - timedelta(hours=3))
     assert c.get("/health").status_code == 503
+
+
+TOKEN = "hook-token"
+
+
+def hooked(monkeypatch):
+    """The images webhook checks were run for, with a Checker that only writes them down."""
+    images = []
+
+    class FakeChecker:
+        @classmethod
+        def from_config(cls, config, dry_run=False):
+            return cls()
+
+        def run(self, image=None):
+            images.append(image)
+            return RunResult()
+
+    monkeypatch.setattr(web, "Checker", FakeChecker)
+    return images
+
+
+def wait_for(items, count):
+    for _ in range(500):
+        if len(items) >= count:
+            return items
+        time.sleep(0.01)
+    raise AssertionError(f"expected {count}, got {items}")
+
+
+def test_webhooks_need_a_token(tmp_path, monkeypatch):
+    hooked(monkeypatch)
+    assert client(tmp_path).post("/hooks/generic", json={"image": RADARR}).status_code == 404  # no token, no hooks
+    c = client(tmp_path, webhook_token=TOKEN, web_password=PASSWORD)  # a token instead of the login
+    assert c.post("/hooks/generic", json={"image": RADARR}).status_code == 401
+    assert c.post("/hooks/generic?token=a-guess", json={"image": RADARR}).status_code == 401
+
+
+def test_the_generic_webhook(tmp_path, monkeypatch):
+    images = hooked(monkeypatch)
+    c = client(tmp_path, webhook_token=TOKEN)
+    response = c.post("/hooks/generic", json={"image": RADARR}, headers={"Authorization": f"Bearer {TOKEN}"})
+    assert (response.status_code, response.text) == (202, f"Checking {RADARR}.")
+    assert c.post(f"/hooks/generic?token={TOKEN}", json={"image": "redis:8"}).status_code == 202
+    assert wait_for(images, 2) == [RADARR, "redis:8"]
+    assert c.post(f"/hooks/generic?token={TOKEN}", json={"name": "redis"}).status_code == 400
+    assert c.post(f"/hooks/generic?token={TOKEN}", content="not JSON").status_code == 400
+    assert c.post(f"/hooks/nobody?token={TOKEN}", json={"image": RADARR}).status_code == 404
+
+
+def test_webhook_checks_queue_up():
+    checked, go = [], threading.Event()
+
+    def check(image):
+        checked.append(image)
+        if image == "broken":
+            raise RuntimeError("Docker went away")
+        go.wait(5)
+
+    hooks = Hooks(check)
+    hooks.add("redis:8")
+    wait_for(checked, 1)  # running now, so it's no longer waiting
+    assert hooks.add("jellyfin/jellyfin:latest") and not hooks.add("jellyfin/jellyfin:latest")
+    assert hooks.add("redis:8")  # again: a newer image may have come out since its check started
+    go.set()
+    hooks.add("broken")
+    hooks.add(RADARR)
+    assert wait_for(checked, 5) == ["redis:8", "jellyfin/jellyfin:latest", "redis:8", "broken", RADARR]
 
 
 def csrf(page):

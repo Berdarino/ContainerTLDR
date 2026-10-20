@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
-OPEN = ("/login", "/static/", "/health")
+OPEN = ("/login", "/static/", "/health", "/hooks/")  # webhooks have a token of their own
 
 
 def session_key(data_dir: Path, password: str) -> str:
@@ -25,6 +25,12 @@ def session_key(data_dir: Path, password: str) -> str:
 def same_password(attempt: str, password: str) -> bool:
     # Hashed first, so the comparison takes as long whatever the attempt's length
     return hmac.compare_digest(hashlib.sha256(attempt.encode()).digest(), hashlib.sha256(password.encode()).digest())
+
+
+def sent_token(request: Request) -> str:
+    """A webhook's token, from an Authorization: Bearer header or, for senders that can't set one, ?token=."""
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    return token.strip() if scheme.lower() == "bearer" else request.query_params.get("token", "")
 
 
 class RequireLogin(BaseHTTPMiddleware):

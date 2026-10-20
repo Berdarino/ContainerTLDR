@@ -74,16 +74,20 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # as PID 1 in a container, SIGTERM is ignored otherwise
     if config.web_port:
-        start_web(config)
+        start_web(config, args.dry_run)
     follow_schedule(config, args.dry_run)
     return 0
 
 
-def start_web(config: Config) -> uvicorn.Server:
+def start_web(config: Config, dry_run: bool = False) -> uvicorn.Server:
     """Serve the web UI from a thread, so the schedule keeps the main thread and its SIGTERM handling."""
     # log_config=None keeps our log format; a line per page view would bury the checks' own lines
     uv_config = uvicorn.Config(
-        create_app(config), host=config.web_host, port=config.web_port, log_config=None, access_log=False
+        create_app(config, dry_run=dry_run),
+        host=config.web_host,
+        port=config.web_port,
+        log_config=None,
+        access_log=False,
     )
     server = uvicorn.Server(uv_config)
     threading.Thread(target=server.run, name="web", daemon=True).start()

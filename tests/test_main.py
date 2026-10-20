@@ -194,7 +194,7 @@ def test_broken_saved_settings_keep_the_ones_in_use(env, caplog):
 
 def test_the_web_ui_only_runs_on_a_schedule_with_a_port(monkeypatch):
     started = []
-    monkeypatch.setattr(cli, "start_web", lambda config: started.append(config.web_port))
+    monkeypatch.setattr(cli, "start_web", lambda config, dry_run: started.append(config.web_port))
     monkeypatch.setattr(cli, "follow_schedule", lambda config, dry_run: None)
     monkeypatch.setattr(cli.signal, "signal", lambda *args: None)
     cli.main([])
