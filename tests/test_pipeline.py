@@ -286,6 +286,20 @@ def test_version_change_without_notes_links_elsewhere(tmp_path):
     assert lab.github.calls == []
 
 
+def test_empty_release_notes_link_to_the_changelog_instead(tmp_path):
+    empty = Release("v1.90.9", day("2026-10-01"), "", "https://github.com/tailscale/tailscale/releases/tag/v1.90.9")
+    lab = Homelab(
+        tmp_path,
+        [group("tailscale/tailscale:latest")],
+        {"tailscale/tailscale:latest": remote("sha256:new")},
+        {"tailscale/tailscale": [empty]},
+    )
+    lab.check()
+    update = lab.notifier.updates[0]
+    assert update.link == "https://tailscale.com/changelog"
+    assert update.summary == "No detailed release notes for this change, see the link above."
+
+
 def test_unknown_versions_go_by_build_dates(tmp_path):
     app = "ghcr.io/someone/app:latest"
     releases = {

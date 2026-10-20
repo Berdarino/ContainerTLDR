@@ -217,6 +217,7 @@ class Checker:
         link = releases[-1].url if releases else upstream.notes_url
 
         if notes.body_chars < MIN_NOTES_CHARS:
+            link = upstream.notes_url or link  # Tailscale's releases are empty; its changelog lives elsewhere
             summary = "No detailed release notes for this change" + (", see the link above." if link else ".")
             footer = "No usable release notes on GitHub"
         elif self.llm is None:
