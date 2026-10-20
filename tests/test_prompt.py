@@ -50,7 +50,18 @@ def test_forces_review_when_a_breaking_change_is_listed():
 
 
 @pytest.mark.parametrize(
-    "breaking", ["None mentioned", '"None mentioned."', "None", "No breaking changes mentioned", "N/A"]
+    "breaking",
+    [
+        "None mentioned",
+        '"None mentioned."',
+        "None",
+        "No breaking changes mentioned",
+        "N/A",
+        # Real qwen3:8b phrasings
+        "None mentioned in the release notes",
+        "No breaking changes or required actions mentioned",
+        "None were mentioned in the provided notes",
+    ],
 )
 def test_keeps_safe_verdict_when_nothing_breaks(breaking):
     reply = f"**Breaking / action needed:** {breaking}\n**Security:** None mentioned\n**Verdict:** Safe to update"

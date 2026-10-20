@@ -30,7 +30,12 @@ _TAGS = re.compile(r"</?notes>", re.I)
 _THINK = re.compile(r"<think>.*?</think>", re.S)
 _BREAKING = re.compile(r"^[*_ ]*Breaking[^:\n]*:[*_ ]*(.*)$", re.M | re.I)
 _VERDICT = re.compile(r"^[*_ ]*Verdict[^:\n]*:[*_ ]*(.*)$", re.M | re.I)
-_NOTHING = re.compile(r"(none|nothing|n/a|no breaking changes?)( mentioned| noted| listed)?( in the notes)?", re.I)
+# "None", "None mentioned in the release notes", "No breaking changes or required actions mentioned", ...
+_NOTHING = re.compile(
+    r"(none|nothing|n/a|no breaking changes?( or (required )?actions?)?)( (are |were )?(mentioned|noted|listed))?"
+    r"( in the( provided)?( release)? notes)?",
+    re.I,
+)
 
 
 def build_messages(app: str, current: str, new: str, notes: str) -> list[dict[str, str]]:
