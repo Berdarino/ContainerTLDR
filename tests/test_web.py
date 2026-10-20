@@ -121,6 +121,15 @@ def test_containers(tmp_path):
     assert page.index("someone/app:latest") < page.index("postgres:18") < page.index(RADARR)  # by container
 
 
+def test_containers_with_a_fix(tmp_path):
+    fixes = {"ghcr.io/someone/app": {"repo": "someone/app-server"}}
+    (tmp_path / "settings.json").write_text(json.dumps({"version": 1, "images": fixes}))
+    docker = FakeDocker([group("ghcr.io/someone/app:latest", {VERSION: "2.1.0"})])
+    page = client(tmp_path, docker).get("/containers").text
+    assert '<a href="https://github.com/someone/app-server">someone/app-server</a>' in page
+    assert "fixed in the web UI" in page and 'class="fix"' not in page  # no longer a guess
+
+
 def test_rows_that_probably_need_a_label(tmp_path):
     docker = FakeDocker(
         [

@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from ..config import Config, ConfigError, load, read_settings, write_settings
+from ..config import Config, ConfigError, load, read_fixes, read_settings, write_settings
 from ..discovery import Docker, ImageGroup
 from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
@@ -101,8 +101,12 @@ def create_app(
         except httpx.HTTPError as e:
             error = f"Can't reach Docker at {in_use.docker_host}: {e}"
             return templates.TemplateResponse(request, "containers.html", {"error": error})
+        try:
+            fixes = read_fixes(config.data_dir)
+        except ConfigError:  # the settings page shows what's wrong
+            fixes = {}
         entries = State.load(config.data_dir / "state.json", readonly=True).entries
-        rows = sorted((_row(g, mappings, entries) for g in groups), key=lambda r: r.group.containers)
+        rows = sorted((_row(g, mappings, fixes, entries) for g in groups), key=lambda r: r.group.containers)
         return templates.TemplateResponse(request, "containers.html", {"rows": rows})
 
     async def settings(request: Request) -> Response:
@@ -187,11 +191,11 @@ def create_app(
     return Starlette(routes=routes, middleware=[session, Middleware(RequireLogin)])
 
 
-def _row(group: ImageGroup, mappings: dict[str, dict], entries: dict[str, Entry]) -> Row:
+def _row(group: ImageGroup, mappings: dict[str, dict], fixes: dict[str, dict], entries: dict[str, Entry]) -> Row:
     entry = entries.get(state_key(group.ref, group.local.id))
     try:
         # The running image's labels; a check reads the new image's, which nearly always say the same
-        upstream = resolve(group.image, group.labels, group.local.config.get("Labels"), mappings)
+        upstream = resolve(group.image, group.labels, group.local.config.get("Labels"), mappings, fixes)
     except ValueError as e:
         return Row(group, None, None, entry, str(e))
     return Row(group, upstream, read_version(group.local.config, upstream.version), entry)
