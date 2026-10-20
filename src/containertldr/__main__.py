@@ -5,6 +5,7 @@ import os
 import signal
 import sys
 import time
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from pathlib import Path
@@ -18,7 +19,7 @@ from .pipeline import Checker, RunResult
 
 log = logging.getLogger("containertldr")
 
-HEARTBEAT = "heartbeat.json"
+HEARTBEAT, LAST_RUN = "heartbeat.json", "last_run.json"
 # How late a check may finish before the healthcheck fails; many summaries on a slow GPU take a while
 GRACE = timedelta(hours=2)
 
@@ -77,14 +78,18 @@ def main(argv: list[str] | None = None) -> int:
 
 def check(config: Config, dry_run: bool) -> RunResult | None:
     """One run. None if it failed as a whole, e.g. Docker was unreachable, which it also tries to report."""
+    started = datetime.now(UTC)
     try:
         result = Checker.from_config(config, dry_run).run()
     except Exception as e:
         log.exception("check failed")
+        failure = f"the whole check failed: {type(e).__name__}: {e}"
         try:
-            Notifier(config.notify_urls, dry_run=dry_run).errors([f"the whole check failed: {type(e).__name__}: {e}"])
+            Notifier(config.notify_urls, dry_run=dry_run).errors([failure])
         except Exception as notify_error:
             log.error("couldn't report that either: %s", notify_error)
+        if not dry_run:
+            write_last_run(config.data_dir, started, RunResult(errors=[failure]))
         return None
     log.info(
         "check done: %d update(s), %d rebuild(s), %d baselined, %d error(s)",
@@ -93,6 +98,8 @@ def check(config: Config, dry_run: bool) -> RunResult | None:
         result.baselined,
         len(result.errors),
     )
+    if not dry_run:
+        write_last_run(config.data_dir, started, result)
     return result
 
 
@@ -114,7 +121,20 @@ def next_check(config: Config, after: datetime) -> datetime:
 
 
 def write_heartbeat(data_dir: Path, due: datetime) -> None:
-    (data_dir / HEARTBEAT).write_text(json.dumps({"next_check": due.isoformat()}) + "\n")
+    _write_json(data_dir / HEARTBEAT, {"next_check": due.isoformat()})
+
+
+def write_last_run(data_dir: Path, started: datetime, result: RunResult) -> None:
+    """For the web UI's status page."""
+    finished = datetime.now(UTC)
+    times = {"started": started.isoformat(timespec="seconds"), "finished": finished.isoformat(timespec="seconds")}
+    _write_json(data_dir / LAST_RUN, times | asdict(result))
+
+
+def _write_json(path: Path, data: dict) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n")
+    os.replace(tmp, path)  # the web UI reads these files from another thread, so never leave half of one
 
 
 def healthcheck(data_dir: Path) -> int:

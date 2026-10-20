@@ -100,10 +100,27 @@ def test_test_mode():
     assert ("test", "radarr") in FakeChecker.calls
 
 
-def test_a_failed_check_is_reported():
+def test_a_failed_check_is_reported(env):
     FakeChecker.result = ConnectionError("can't reach socket-proxy:2375")
     assert cli.main(["--once"]) == 1
-    assert FakeNotifier.sent == [["the whole check failed: ConnectionError: can't reach socket-proxy:2375"]]
+    failure = "the whole check failed: ConnectionError: can't reach socket-proxy:2375"
+    assert FakeNotifier.sent == [[failure]]
+    assert json.loads((env / "data" / "last_run.json").read_text())["errors"] == [failure]
+
+
+def test_the_last_run_is_kept_for_the_status_page(env):
+    FakeChecker.result = RunResult(updates=1, baselined=2, errors=["redis: oops"])
+    cli.main(["--once"])
+    last = json.loads((env / "data" / "last_run.json").read_text())
+    assert (last["updates"], last["rebuilds"], last["baselined"], last["errors"]) == (1, 0, 2, ["redis: oops"])
+    assert last["started"] <= last["finished"]
+    assert sorted(p.name for p in (env / "data").iterdir()) == ["last_run.json"]  # no temp file left behind
+
+
+def test_dry_run_keeps_no_last_run(env):
+    (env / "data").mkdir()
+    cli.main(["--once", "--dry-run"])
+    assert not (env / "data" / "last_run.json").exists()
 
 
 def test_schedule_writes_the_heartbeat_before_waiting(monkeypatch, env):
