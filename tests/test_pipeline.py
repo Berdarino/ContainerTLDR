@@ -222,6 +222,24 @@ def test_up_to_date_and_removed_images_are_forgotten(tmp_path):
     assert lab.state.entries == {}
 
 
+def test_checking_one_image(tmp_path):
+    redis = group("redis:8", env=["REDIS_VERSION=8.2.1"])
+    lab = radarr_lab(tmp_path)
+    lab.docker.groups.append(redis)
+    lab.registry.images["redis:8"] = remote("sha256:new", env=["REDIS_VERSION=8.2.2"])
+    state = State.load(lab.path)
+    state.record(state_key("ghcr.io/someone/gone:1", "sha256:id-gone"), "sha256:x", "1.0")
+    state.errors = {"jellyfin: rate limit reached"}
+    state.save()
+
+    # Named the way the registry knows it; the container says lscr.io, which is the same registry
+    assert lab.checker().run("ghcr.io/linuxserver/radarr:latest").updates == 1
+    assert lab.registry.configs == ["lscr.io/linuxserver/radarr"]  # redis wasn't looked at
+    assert state_key("ghcr.io/someone/gone:1", "sha256:id-gone") in lab.state.entries
+    assert lab.state.errors == {"jellyfin: rate limit reached"}
+    assert lab.checker().run("redis:7").updates == 0  # not the tag that runs
+
+
 def test_one_broken_image_does_not_stop_the_others(tmp_path):
     lab = radarr_lab(tmp_path)
     lab.docker.groups.insert(0, group("redis:8.8-alpine", env=["REDIS_VERSION=8.8.2"]))

@@ -1,4 +1,5 @@
 import logging
+import threading
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
@@ -9,9 +10,9 @@ from .llm import Ollama, OpenAICompatible, llm_for, summarise
 from .messages import Rebuild, Update
 from .notes import brief_notes, build_notes
 from .notify import Notifier, NotifyError
-from .registry import Registry, RegistryError, Unavailable
+from .registry import Registry, RegistryError, Unavailable, parse_ref
 from .releases import Release, select_releases
-from .resolve import GUESSES, Upstream, load_mappings, resolve
+from .resolve import GUESSES, Upstream, image_key, load_mappings, resolve
 from .state import State, state_key
 from .versions import parse_version, read_version
 
@@ -19,6 +20,9 @@ log = logging.getLogger(__name__)
 
 MIN_NOTES_CHARS = 200  # less than this is usually just a link to a changelog somewhere else
 REVISION = "org.opencontainers.image.revision"
+# Scheduled and webhook checks both write state.json, from different threads. Hold this from loading the state
+# until the run is done, so neither works from a copy the other has already changed.
+CHECKING = threading.Lock()
 
 
 @dataclass
@@ -83,10 +87,18 @@ class Checker:
             read_fixes(config.data_dir),
         )
 
-    def run(self) -> RunResult:
+    def run(self, image: str | None = None) -> RunResult:
+        """Check every running image, or only the containers running image (a reference, as a webhook names it).
+
+        A check of one image leaves what's remembered about the others alone.
+        """
         result = RunResult()
         groups = self.docker.running(self.config.include_label, self.config.exclude_label)
-        self.state.keep_only({state_key(g.ref, g.local.id) for g in groups})
+        if image is None:
+            self.state.keep_only({state_key(g.ref, g.local.id) for g in groups})
+        else:
+            wanted = parse_ref(image)
+            groups = [g for g in groups if (image_key(g.image.name), g.image.tag) == (image_key(image), wanted.tag)]
         baseline = self.state.first_run and self.config.initial_run == "baseline"
         rebuilds = []
         for group in groups:
@@ -111,7 +123,7 @@ class Checker:
                 result.errors.append(f"{', '.join(group.containers)}: {_describe(e)}")
 
         self._report_rebuilds(rebuilds, result)
-        self._report_errors(result.errors)
+        self._report_errors(result.errors, every_image=image is None)
         self.state.save()  # also leaves a file behind after a first run that had nothing to record
         return result
 
@@ -231,9 +243,10 @@ class Checker:
             footer += f" · repo {upstream.repo} guessed from the {upstream.found_by}"
         return Update(group.containers, group.ref, group.stacks, change.current, change.new, summary, link, footer)
 
-    def _report_errors(self, errors: list[str]) -> None:
+    def _report_errors(self, errors: list[str], every_image: bool = True) -> None:
         """Send the errors that weren't sent before. One that clears up and later comes back is sent again."""
-        remembered = self.state.errors & set(errors)
+        # Only a check of every image can tell which earlier errors have cleared up
+        remembered = self.state.errors & set(errors) if every_image else set(self.state.errors)
         new = [e for e in errors if e not in self.state.errors]
         if new:
             try:

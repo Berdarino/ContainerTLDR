@@ -18,7 +18,7 @@ from croniter import croniter
 from .config import SETTINGS, Config, ConfigError, data_dir, load, read_settings
 from .heartbeat import HEARTBEAT, overdue
 from .notify import Notifier
-from .pipeline import Checker, RunResult
+from .pipeline import CHECKING, Checker, RunResult
 from .web import create_app
 
 log = logging.getLogger("containertldr")
@@ -94,7 +94,8 @@ def check(config: Config, dry_run: bool) -> RunResult | None:
     """One run. None if it failed as a whole, e.g. Docker was unreachable, which it also tries to report."""
     started = datetime.now(UTC)
     try:
-        result = Checker.from_config(config, dry_run).run()
+        with CHECKING:
+            result = Checker.from_config(config, dry_run).run()
     except Exception as e:
         log.exception("check failed")
         failure = f"the whole check failed: {type(e).__name__}: {e}"
