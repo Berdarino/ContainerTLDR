@@ -45,6 +45,8 @@ class Config:
     registry_credentials: dict[str, tuple[str, str]] = field(default_factory=dict, repr=False)
     data_dir: Path = Path("/data")
     log_level: str = "info"
+    web_port: int | None = None  # no web UI, and no open port, unless it's set
+    web_host: str = "0.0.0.0"
 
 
 def load(env: Mapping[str, str] = os.environ) -> Config:
@@ -71,6 +73,10 @@ def load(env: Mapping[str, str] = os.environ) -> Config:
         read.problems.append(f"can't read registry logins from {docker_config}: {e}")
         credentials = {}
 
+    web_port = read.number("WEB_PORT", 0) or None
+    if web_port and web_port > 65535:
+        read.problems.append(f"{PREFIX}WEB_PORT should be a port number like 8080, not {web_port}")
+
     config = Config(
         notify_urls=notify_urls,
         schedule=read.text("SCHEDULE", "30 4 * * *"),
@@ -92,6 +98,8 @@ def load(env: Mapping[str, str] = os.environ) -> Config:
         registry_credentials=credentials,
         data_dir=Path(read.text("DATA_DIR", "/data")),
         log_level=read.choice("LOG_LEVEL", "info", LOG_LEVELS),
+        web_port=web_port,
+        web_host=read.text("WEB_HOST", "0.0.0.0"),
     )
     if read.problems:
         raise ConfigError("\n".join(read.problems))

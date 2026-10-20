@@ -18,6 +18,7 @@ def test_defaults(tmp_path):
     c = config(tmp_path, CTLDR_NOTIFY_URLS=DISCORD)
     assert c == Config(notify_urls=[DISCORD])
     assert c.data_dir == Path("/data")
+    assert c.web_port is None
 
 
 def test_reports_every_problem_at_once(tmp_path):
@@ -47,10 +48,18 @@ def test_settings(tmp_path):
         CTLDR_INSECURE_REGISTRIES="registry:5000, registry.lan:5000",
         CTLDR_TZ="Europe/London",
         TZ="Asia/Tokyo",
+        CTLDR_WEB_PORT="8080",
     )
     assert (c.llm_provider, c.llm_url, c.notify_rebuilds) == ("openai_compat", "http://lmstudio:1234/v1", False)
     assert c.insecure_registries == ["registry:5000", "registry.lan:5000"]
     assert c.tz == "Europe/London"
+    assert (c.web_host, c.web_port) == ("0.0.0.0", 8080)
+
+
+@pytest.mark.parametrize("port", ["http", "0", "70000"])
+def test_web_port_must_be_a_port(tmp_path, port):
+    with pytest.raises(ConfigError, match="CTLDR_WEB_PORT should be"):
+        config(tmp_path, CTLDR_NOTIFY_URLS=DISCORD, CTLDR_WEB_PORT=port)
 
 
 def test_split_urls():
