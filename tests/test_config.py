@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from containertldr.config import Config, ConfigError, load, registry_credentials, split_urls
+from containertldr.config import Config, ConfigError, load, read_settings, registry_credentials, split_urls
 
 DISCORD = "discord://123/AbC-token"
 
 
-def config(tmp_path, **env):
+def config(tmp_path, settings=None, **env):
     # DOCKER_CONFIG points at an empty folder so the developer's own ~/.docker/config.json never leaks in
-    return load({"DOCKER_CONFIG": str(tmp_path), **env})
+    return load({"DOCKER_CONFIG": str(tmp_path), **env}, settings)
 
 
 def test_defaults(tmp_path):
@@ -87,6 +87,43 @@ def test_secrets_from_files(tmp_path):
 def test_unreadable_secret_file(tmp_path):
     with pytest.raises(ConfigError, match="GITHUB_TOKEN_FILE: can't read"):
         config(tmp_path, CTLDR_NOTIFY_URLS=DISCORD, GITHUB_TOKEN_FILE=str(tmp_path / "missing"))
+
+
+def test_saved_settings_come_after_the_environment(tmp_path):
+    saved = {"llm_url": "http://saved:11434", "llm_model": "llama3.2", "notify_rebuilds": "no", "tz": "Asia/Tokyo"}
+    c = config(tmp_path, saved, CTLDR_NOTIFY_URLS=DISCORD, CTLDR_LLM_URL="http://env:11434", TZ="Europe/London")
+    assert (c.llm_url, c.llm_model, c.notify_rebuilds) == ("http://env:11434", "llama3.2", False)
+    assert c.tz == "Europe/London"  # plain TZ is an environment variable too
+    assert c.schedule == "30 4 * * *"
+
+
+def test_saved_secrets(tmp_path):
+    (tmp_path / "token").write_text("ghp_from_file\n")
+    saved = {"notify_urls": DISCORD, "github_token": "ghp_saved", "llm_api_key": "sk-saved"}
+    c = config(tmp_path, saved, GITHUB_TOKEN_FILE=str(tmp_path / "token"))
+    assert (c.notify_urls, c.github_token, c.llm_api_key) == ([DISCORD], "ghp_from_file", "sk-saved")
+
+
+def test_saved_settings_are_checked_the_same_way(tmp_path):
+    saved = {"llm_num_ctx": "8k", "llm_provider": "anthropic"}
+    with pytest.raises(ConfigError) as error:
+        config(tmp_path, saved, CTLDR_NOTIFY_URLS=DISCORD, CTLDR_LLM_PROVIDER="ollama")
+    assert str(error.value) == "CTLDR_LLM_NUM_CTX (saved in the web UI) should be a positive whole number, not '8k'"
+
+
+def test_some_settings_only_come_from_the_environment(tmp_path):
+    saved = {"data_dir": "/elsewhere", "web_port": "1", "web_host": "127.0.0.1"}
+    c = config(tmp_path, saved, CTLDR_NOTIFY_URLS=DISCORD)
+    assert (c.data_dir, c.web_port, c.web_host) == (Path("/data"), None, "0.0.0.0")
+
+
+def test_read_settings(tmp_path):
+    assert read_settings(tmp_path) == {}
+    (tmp_path / "settings.json").write_text(json.dumps({"version": 1, "settings": {"llm_model": "llama3.2"}}))
+    assert read_settings(tmp_path) == {"llm_model": "llama3.2"}
+    (tmp_path / "settings.json").write_text("{")
+    with pytest.raises(ConfigError, match="can't read .*settings.json"):
+        read_settings(tmp_path)
 
 
 def test_repr_hides_secrets(tmp_path):

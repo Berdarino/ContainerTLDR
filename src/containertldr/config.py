@@ -16,6 +16,9 @@ PREFIX = "CTLDR_"
 PROVIDERS = ("ollama", "openai_compat", "none")
 INITIAL_RUNS = ("baseline", "notify")
 LOG_LEVELS = ("debug", "info", "warning", "error")
+SETTINGS = "settings.json"
+# Where the settings file is, and what the web UI listens on, can't be changed from the web UI itself
+ENV_ONLY = ("data_dir", "web_port", "web_host")
 
 
 class ConfigError(Exception):
@@ -49,18 +52,19 @@ class Config:
     web_host: str = "0.0.0.0"
 
 
-def load(env: Mapping[str, str] = os.environ) -> Config:
-    """Settings from CTLDR_* environment variables, reporting every problem at once.
+def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None = None) -> Config:
+    """Settings from CTLDR_* environment variables, then from settings saved in the web UI, then the defaults.
 
-    Secrets (the notify URLs, the LLM key, GITHUB_TOKEN) can come from a file named in <NAME>_FILE instead,
-    for Docker secrets.
+    Every problem is reported at once. Secrets (the notify URLs, the LLM key, GITHUB_TOKEN) can come from a file
+    named in <NAME>_FILE instead, for Docker secrets.
     """
-    read = _Reader(env)
+    saved = {k: v for k, v in (settings or {}).items() if k not in ENV_ONLY}
+    read = _Reader(env, saved)
     notify_urls = split_urls(read.secret(PREFIX + "NOTIFY_URLS") or "")
     if not notify_urls:
         read.problems.append(f"{PREFIX}NOTIFY_URLS is required: one or more Apprise or Discord webhook URLs")
 
-    tz = read.text("TZ") or env.get("TZ") or "UTC"
+    tz = env.get(PREFIX + "TZ") or env.get("TZ") or saved.get("tz") or "UTC"
     try:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError):
@@ -106,6 +110,17 @@ def load(env: Mapping[str, str] = os.environ) -> Config:
     return config
 
 
+def read_settings(data_dir: Path) -> dict[str, str]:
+    """What was saved on the web UI's settings page, as the strings the environment variables would hold."""
+    path = data_dir / SETTINGS
+    try:
+        return json.loads(path.read_text())["settings"]
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError, KeyError) as e:
+        raise ConfigError(f"can't read {path}: {e}") from e
+
+
 def split_urls(value: str) -> list[str]:
     """Split on commas, spaces or newlines, but only before a new scheme://, since URLs can contain commas
     themselves (mailto://...?to=a@x.com,b@x.com)."""
@@ -133,14 +148,16 @@ def registry_credentials(path: Path) -> dict[str, tuple[str, str]]:
 
 
 class _Reader:
-    """Reads CTLDR_* variables and collects what's wrong with them instead of stopping at the first."""
+    """Reads CTLDR_* variables, falling back to the saved settings, and collects what's wrong with them instead of
+    stopping at the first. Saved settings are keyed by Config field: CTLDR_LLM_URL is llm_url."""
 
-    def __init__(self, env: Mapping[str, str]):
+    def __init__(self, env: Mapping[str, str], settings: Mapping[str, str]):
         self.env = env
+        self.settings = settings
         self.problems: list[str] = []
 
     def text(self, name: str, default: str | None = None) -> str | None:
-        return self.env.get(PREFIX + name) or default
+        return self.env.get(PREFIX + name) or self.settings.get(name.lower()) or default
 
     def secret(self, key: str) -> str | None:
         if path := self.env.get(key + "_FILE"):
@@ -148,14 +165,14 @@ class _Reader:
                 return Path(path).read_text().strip()
             except OSError as e:
                 self.problems.append(f"{key}_FILE: can't read {path}: {e.strerror}")
-        return self.env.get(key) or None
+        return self.env.get(key) or self.settings.get(key.removeprefix(PREFIX).lower()) or None
 
     def number(self, name: str, default: int) -> int:
         value = self.text(name)
         if value is None:
             return default
         if not value.isdigit() or int(value) == 0:
-            self.problems.append(f"{PREFIX}{name} should be a positive whole number, not {value!r}")
+            self.problems.append(f"{self._label(name)} should be a positive whole number, not {value!r}")
             return default
         return int(value)
 
@@ -164,13 +181,18 @@ class _Reader:
         if not value:
             return default
         if value not in ("true", "false", "yes", "no", "1", "0", "on", "off"):
-            self.problems.append(f"{PREFIX}{name} should be true or false, not {value!r}")
+            self.problems.append(f"{self._label(name)} should be true or false, not {value!r}")
             return default
         return value in ("true", "yes", "1", "on")
 
     def choice(self, name: str, default: str, choices: tuple[str, ...]) -> str:
         value = (self.text(name) or default).lower()
         if value not in choices:
-            self.problems.append(f"{PREFIX}{name} should be one of {', '.join(choices)}, not {value!r}")
+            self.problems.append(f"{self._label(name)} should be one of {', '.join(choices)}, not {value!r}")
             return default
         return value
+
+    def _label(self, name: str) -> str:
+        if self.env.get(PREFIX + name) or name.lower() not in self.settings:
+            return PREFIX + name
+        return f"{PREFIX}{name} (saved in the web UI)"  # so nobody goes looking for a variable they never set
