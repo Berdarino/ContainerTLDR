@@ -4,7 +4,7 @@ import re
 import threading
 import time
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -174,6 +174,15 @@ def test_stylesheet(tmp_path):
     response = client(tmp_path).get("/static/style.css")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")
+
+
+def test_health_for_uptime_monitors(tmp_path):
+    c = client(tmp_path, web_password=PASSWORD)  # open even with a login
+    assert (c.get("/health").status_code, c.get("/health").text) == (503, "no heartbeat yet")
+    write_heartbeat(tmp_path, datetime.now(UTC) + timedelta(hours=1))
+    assert (c.get("/health").status_code, c.get("/health").text) == (200, "ok")
+    write_heartbeat(tmp_path, datetime.now(UTC) - timedelta(hours=3))
+    assert c.get("/health").status_code == 503
 
 
 def csrf(page):

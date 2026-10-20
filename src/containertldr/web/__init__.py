@@ -15,13 +15,14 @@ from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from ..config import Config, ConfigError, load, read_fixes, read_settings, write_fixes, write_settings
 from ..discovery import Docker, ImageGroup
+from ..heartbeat import overdue
 from ..registry import ImageRef, parse_ref
 from ..resolve import GUESSES, Upstream, image_key, load_mappings, resolve
 from ..state import Entry, State, state_key
@@ -87,6 +88,11 @@ def create_app(
         if host not in clients:
             clients[host] = docker(host)
         return clients[host]
+
+    def health(request: Request) -> Response:
+        """For uptime monitors: 503 when the scheduled check is overdue. Open without a login, and says no more."""
+        problem = overdue(config.data_dir)
+        return PlainTextResponse(problem or "ok", status_code=503 if problem else 200)
 
     def status(request: Request) -> Response:
         in_use = current()
@@ -221,6 +227,7 @@ def create_app(
         Route("/", status),
         Route("/containers", containers),
         Route("/settings", settings, methods=["GET", "POST"]),
+        Route("/health", health),
         Mount("/static", static),
     ]
     if not config.web_password:

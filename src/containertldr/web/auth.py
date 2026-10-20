@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
-OPEN = ("/login", "/static/")
+OPEN = ("/login", "/static/", "/health")
 
 
 def session_key(data_dir: Path, password: str) -> str:

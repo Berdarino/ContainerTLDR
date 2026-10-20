@@ -162,6 +162,9 @@ check, without a restart. The test buttons use what's saved.
 The pages only read the Docker API and what the checks saved, so opening them costs no registry or GitHub rate
 limit.
 
+For an uptime monitor, `/health` answers `ok` while the scheduled check is on time and 503 when it's overdue. It
+needs no login and says nothing else.
+
 ## Models
 
 Summaries run one at a time. On a GTX 1080, qwen3:8b with an 8k context takes 20 to 50 seconds per summary.

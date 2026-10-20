@@ -10,6 +10,7 @@ import pytest
 
 from containertldr import __main__ as cli
 from containertldr.config import Config, load
+from containertldr.heartbeat import GRACE
 from containertldr.pipeline import RunResult
 
 
@@ -224,5 +225,5 @@ def test_healthcheck(env):
     assert cli.healthcheck(env) == 1  # no heartbeat yet
     cli.write_heartbeat(env, datetime.now(UTC) - timedelta(hours=1))
     assert cli.healthcheck(env) == 0  # running late, but within the grace period
-    cli.write_heartbeat(env, datetime.now(UTC) - cli.GRACE - timedelta(minutes=1))
+    cli.write_heartbeat(env, datetime.now(UTC) - GRACE - timedelta(minutes=1))
     assert cli.healthcheck(env) == 1

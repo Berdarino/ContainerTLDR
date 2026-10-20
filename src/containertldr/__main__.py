@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 from dataclasses import asdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -16,15 +16,14 @@ import uvicorn
 from croniter import croniter
 
 from .config import SETTINGS, Config, ConfigError, data_dir, load, read_settings
+from .heartbeat import HEARTBEAT, overdue
 from .notify import Notifier
 from .pipeline import Checker, RunResult
 from .web import create_app
 
 log = logging.getLogger("containertldr")
 
-HEARTBEAT, LAST_RUN = "heartbeat.json", "last_run.json"
-# How late a check may finish before the healthcheck fails; many summaries on a slow GPU take a while
-GRACE = timedelta(hours=2)
+LAST_RUN = "last_run.json"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -179,14 +178,9 @@ def _write_json(path: Path, data: dict) -> None:
 
 
 def healthcheck(data_dir: Path) -> int:
-    """0 unless the next check is overdue. The schedule loop writes when that is before it starts waiting."""
-    try:
-        due = datetime.fromisoformat(json.loads((data_dir / HEARTBEAT).read_text())["next_check"])
-    except (OSError, ValueError, KeyError):
-        print("no heartbeat yet")
-        return 1
-    if datetime.now(UTC) > due + GRACE:
-        print(f"the check due at {due:%Y-%m-%d %H:%M %Z} hasn't finished")
+    """0 unless the next check is overdue."""
+    if problem := overdue(data_dir):
+        print(problem)
         return 1
     return 0
 
