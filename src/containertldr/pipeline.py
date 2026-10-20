@@ -112,11 +112,7 @@ class Checker:
                 result.errors.append(f"{', '.join(group.containers)}: {_describe(e)}")
 
         self._report_rebuilds(rebuilds, result)
-        if result.errors:
-            try:
-                self.notifier.errors(result.errors)
-            except NotifyError as e:
-                log.error("couldn't send the error notice: %s", e)
+        self._report_errors(result.errors)
         self.state.save()  # also leaves a file behind after a first run that had nothing to record
         return result
 
@@ -235,6 +231,18 @@ class Checker:
         if upstream.found_by in ("image source label", "ghcr path"):
             footer += f" · repo {upstream.repo} guessed from the {upstream.found_by}"
         return Update(group.containers, group.ref, group.stacks, change.current, change.new, summary, link, footer)
+
+    def _report_errors(self, errors: list[str]) -> None:
+        """Send the errors that weren't sent before. One that clears up and later comes back is sent again."""
+        remembered = self.state.errors & set(errors)
+        new = [e for e in errors if e not in self.state.errors]
+        if new:
+            try:
+                self.notifier.errors(new)
+                remembered |= set(new)
+            except NotifyError as e:
+                log.error("couldn't send the error notice: %s", e)  # not remembered, so it's tried again next run
+        self.state.errors = remembered
 
     def _report_rebuilds(self, changes: list[Change], result: RunResult) -> None:
         if not changes:

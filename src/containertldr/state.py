@@ -34,18 +34,27 @@ class State:
     nothing to record.
     """
 
-    def __init__(self, path: Path, entries: dict[str, Entry], first_run: bool, readonly: bool = False):
+    def __init__(
+        self,
+        path: Path,
+        entries: dict[str, Entry],
+        first_run: bool,
+        readonly: bool = False,
+        errors: set[str] | None = None,
+    ):
         self.path = path
         self.entries = entries
         self.first_run = first_run
         self.readonly = readonly  # --dry-run
+        self.errors = errors or set()  # error lines already sent, so a lasting problem isn't sent every run
 
     @classmethod
     def load(cls, path: Path, readonly: bool = False) -> "State":
         if not path.exists():
             return cls(path, {}, first_run=True, readonly=readonly)
-        images = json.loads(path.read_text())["images"]
-        return cls(path, {k: Entry(**v) for k, v in images.items()}, first_run=False, readonly=readonly)
+        data = json.loads(path.read_text())
+        entries = {k: Entry(**v) for k, v in data["images"].items()}
+        return cls(path, entries, first_run=False, readonly=readonly, errors=set(data.get("errors", [])))
 
     def reported(self, key: str, digest: str) -> bool:
         entry = self.entries.get(key)
@@ -76,7 +85,8 @@ class State:
     def save(self) -> None:
         if self.readonly:
             return
-        data = {"version": 1, "images": {k: asdict(e) for k, e in sorted(self.entries.items())}}
+        images = {k: asdict(e) for k, e in sorted(self.entries.items())}
+        data = {"version": 1, "images": images, "errors": sorted(self.errors)}
         tmp = self.path.with_name(self.path.name + ".tmp")
         tmp.write_text(json.dumps(data, indent=2) + "\n")
         os.replace(tmp, self.path)  # atomic, so a crash never leaves half a file

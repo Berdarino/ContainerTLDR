@@ -106,7 +106,7 @@ class FakeLLM:
 
 class FakeNotifier:
     def __init__(self):
-        self.updates, self.rebuilt, self.errors_sent, self.fail = [], [], [], False
+        self.updates, self.rebuilt, self.errors_sent, self.fail, self.fail_errors = [], [], [], False, False
 
     def update(self, update):
         if self.fail:
@@ -117,6 +117,8 @@ class FakeNotifier:
         self.rebuilt.append(rebuilds)
 
     def errors(self, errors):
+        if self.fail_errors:
+            raise NotifyError("no notification target took it")
         self.errors_sent.append(errors)
 
 
@@ -238,6 +240,37 @@ def test_local_builds_that_were_pushed_are_still_checked(tmp_path):
     lab = radarr_lab(tmp_path)
     lab.docker.groups[0] = group(RADARR, {VERSION: "6.4.4.10685-ls318"}, built_here=True)
     assert lab.check().updates == 1
+
+
+def broken_redis(lab):
+    lab.docker.groups.insert(0, group("redis:8.8-alpine", env=["REDIS_VERSION=8.8.2"]))
+    lab.registry.images["redis:8.8-alpine"] = RegistryError("registry-1.docker.io rate limit reached")
+    return "redis: registry-1.docker.io rate limit reached"
+
+
+def test_a_lasting_problem_is_sent_once(tmp_path):
+    lab = radarr_lab(tmp_path)
+    error = broken_redis(lab)
+    assert lab.check().errors == [error]
+    assert lab.check().errors == [error]  # still logged and in the exit code
+    assert lab.notifier.errors_sent == [[error]]  # but only sent once
+
+    lab.registry.images["redis:8.8-alpine"] = remote("sha256:old")  # it clears up
+    assert lab.check().errors == []
+    lab.registry.images["redis:8.8-alpine"] = RegistryError("registry-1.docker.io rate limit reached")  # comes back
+    lab.check()
+    assert lab.notifier.errors_sent == [[error], [error]]
+
+
+def test_an_error_notice_that_failed_is_sent_next_run(tmp_path):
+    lab = radarr_lab(tmp_path)
+    error = broken_redis(lab)
+    lab.notifier.fail_errors = True
+    lab.check()
+    lab.notifier.fail_errors = False
+    lab.check()  # sent now
+    lab.check()  # and remembered from then on
+    assert lab.notifier.errors_sent == [[error]]
 
 
 def test_label_mistakes_are_reported(tmp_path):

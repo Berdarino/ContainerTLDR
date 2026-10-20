@@ -42,7 +42,7 @@ ContainerTLDR never updates or restarts anything. It only tells you.
 4. An LLM summarises them, and the summary goes to Discord or any of the services
    [Apprise](https://github.com/caronc/apprise) supports (ntfy, Telegram, Gotify, Slack, email and many more).
 5. It remembers what it reported, so each update is reported once. A weekly rebuild of an update you've already
-   been told about stays quiet.
+   been told about stays quiet. Problems are reported once too, and again only if they clear up and come back.
 
 ## Quick start
 

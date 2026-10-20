@@ -83,3 +83,18 @@ def test_readonly_never_writes(tmp_path):
 )
 def test_same_version(a, b, expected):
     assert same_version(a, b) is expected
+
+
+def test_sent_errors_are_remembered(tmp_path):
+    path = tmp_path / "state.json"
+    state = State.load(path)
+    state.errors = {"redis: rate limit reached"}
+    state.save()
+    assert State.load(path).errors == {"redis: rate limit reached"}
+    assert json.loads(path.read_text())["errors"] == ["redis: rate limit reached"]
+
+
+def test_files_from_0_1_0_still_load(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text('{"version": 1, "images": {}}')
+    assert State.load(path).errors == set()
