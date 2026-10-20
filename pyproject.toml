@@ -1,6 +1,6 @@
 [project]
 name = "containertldr"
-version = "0.2.0"
+version = "0.3.0"
 description = "Container update notifications with an LLM summary of the upstream release notes"
 readme = "README.md"
 requires-python = ">=3.12"
