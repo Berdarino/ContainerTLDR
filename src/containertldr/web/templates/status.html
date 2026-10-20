@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Status{% endblock %}
+{% block main %}
+<h2>Checks</h2>
+<dl>
+  {% if last %}
+  <dt>Last check</dt><dd>{{ last.finished | local }}</dd>
+  <dt>Updates</dt><dd>{{ last.updates }}</dd>
+  <dt>Rebuilds</dt><dd>{{ last.rebuilds }}</dd>
+  <dt>Baselined</dt><dd>{{ last.baselined }}</dd>
+  <dt>Errors</dt><dd>{{ last.errors | length }}</dd>
+  {% else %}
+  <dt>Last check</dt><dd>None has finished yet</dd>
+  {% endif %}
+  <dt>Next check</dt><dd>{{ heartbeat.next_check | local if heartbeat else "Not scheduled yet" }}</dd>
+  <dt>Schedule</dt><dd><code>{{ schedule }}</code>, {{ tz }}</dd>
+</dl>
+{% if last and last.errors %}
+<ul class="errors">
+  {% for error in last.errors %}
+  <li>{{ error }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h2>Waiting to be deployed</h2>
+{% for entry in pending %}
+<article>
+  <h3>{% if entry.message.link %}<a href="{{ entry.message.link }}">{{ entry.message.title }}</a>{% else %}{{ entry.message.title }}{% endif %}</h3>
+  <p class="muted">{{ entry.message.footer }}</p>
+  <details>
+    <summary>Summary</summary>
+    <div class="summary">{{ entry.message.summary }}</div>
+  </details>
+</article>
+{% else %}
+<p class="muted">Nothing. A reported update shows here until its container runs the new image.</p>
+{% endfor %}
+{% endblock %}

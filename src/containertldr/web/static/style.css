@@ -1,0 +1,75 @@
+:root {
+  color-scheme: light dark;
+  --muted: #6b7280;
+  --line: #8884;
+  --error: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --muted: #9ca3af;
+    --error: #f87171;
+  }
+}
+
+body {
+  font: 15px/1.5 system-ui, sans-serif;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0 1rem 2rem;
+}
+
+header {
+  display: flex;
+  gap: 2rem;
+  align-items: baseline;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+nav a {
+  margin-right: 1rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin-top: 2rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1.5rem;
+}
+
+dt,
+.muted {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+}
+
+article {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line);
+}
+
+article p {
+  margin: 0.25rem 0;
+}
+
+.errors {
+  color: var(--error);
+}
+
+.summary {
+  white-space: pre-wrap;
+  margin-top: 0.5rem;
+}
