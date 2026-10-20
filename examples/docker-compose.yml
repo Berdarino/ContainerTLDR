@@ -25,7 +25,8 @@ services:
       CTLDR_LLM_MODEL: qwen3:8b
       TZ: Europe/London
       # GITHUB_TOKEN: ghp_...  # optional, raises GitHub's limit from 60 to 5000 requests an hour
-      # CTLDR_WEB_PORT: 8080  # optional read-only web UI, published below
+      # CTLDR_WEB_PORT: 8080  # optional web UI, published below
+      # CTLDR_WEB_PASSWORD: ...  # a login for every page, and the settings page
     volumes:
       - containertldr-data:/data
       # For private images, mount your Docker logins (credential helpers aren't supported):

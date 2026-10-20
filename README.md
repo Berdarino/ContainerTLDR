@@ -71,7 +71,8 @@ docker compose run --rm containertldr --once --dry-run
 
 ## Configuration
 
-Everything is set with environment variables.
+Everything can be set with environment variables. With a [web UI](#web-ui) password, most of it can be changed on
+the settings page too, but an environment variable always wins.
 
 | Variable | Default | |
 |---|---|---|
@@ -95,9 +96,10 @@ Everything is set with environment variables.
 | `CTLDR_LOG_LEVEL` | `info` | `debug`, `info`, `warning` or `error` |
 | `CTLDR_WEB_PORT` | | Turns on the [web UI](#web-ui) on this port. Without it, nothing listens |
 | `CTLDR_WEB_HOST` | `0.0.0.0` | The address the web UI listens on |
+| `CTLDR_WEB_PASSWORD` | | Every web UI page asks for it, and the settings page is only there with it |
 
-`CTLDR_NOTIFY_URLS`, `CTLDR_LLM_API_KEY` and `GITHUB_TOKEN` also work with a `_FILE` suffix pointing at a file,
-for Docker secrets.
+`CTLDR_NOTIFY_URLS`, `CTLDR_LLM_API_KEY`, `GITHUB_TOKEN` and `CTLDR_WEB_PASSWORD` also work with a `_FILE` suffix
+pointing at a file, for Docker secrets.
 
 ## Container labels
 
@@ -131,18 +133,28 @@ then from its `ghcr.io/owner/name` path. When the repo was guessed, the notifica
 
 ## Web UI
 
-Set `CTLDR_WEB_PORT` and publish that port (see the commented lines in the example compose file) for a small
-read-only web UI:
+Set `CTLDR_WEB_PORT` and publish that port (see the commented lines in the example compose file) for a small web
+UI:
 
 - Status: when the last check ran, what it found and its errors, when the next one is due, and the updates that
   were reported but aren't deployed yet, with their summaries.
 - Containers: how the next check will read each running image: where its release notes come from and how that was
   found, its version, and the `containertldr.*` labels in effect. Rows where the repo was guessed, or where no
   repo or version was found, are highlighted. Those probably need a label.
+- Settings: the settings from the table above, to change and save, and buttons that test notifications, the LLM,
+  Docker and the GitHub token. Only with `CTLDR_WEB_PASSWORD`.
+
+Without `CTLDR_WEB_PASSWORD`, the status and containers pages are open to anyone who can reach the port, so keep it
+on your LAN, or put it behind your reverse proxy's authentication if it's reachable from further away. With a
+password, every page asks for it.
+
+On the settings page, a setting that an environment variable sets (plain `TZ` included) is shown but can't be
+changed, so a compose file in git keeps working as it is. An empty field means the default. Secrets can be replaced
+or cleared but are never shown. Saved settings are kept in `/data/settings.json` and apply from the next check,
+without a restart. The test buttons use the saved settings.
 
 The pages only read the Docker API and what the checks saved, so opening them costs no registry or GitHub rate
-limit. There's no login, so keep the port on your LAN, or put it behind your reverse proxy's authentication if
-it's reachable from further away.
+limit.
 
 ## Models
 
