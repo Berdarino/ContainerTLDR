@@ -23,9 +23,10 @@ PASSWORD = "correct horse battery staple"
 
 class FakeDocker:
     def __init__(self, groups):
-        self.groups = groups
+        self.groups, self.filters = groups, []
 
     def running(self, include=None, exclude=None):
+        self.filters.append((include, exclude))
         if isinstance(self.groups, Exception):
             raise self.groups
         return self.groups
@@ -41,7 +42,8 @@ def group(ref, image_labels=None, container_labels=None, env=None):
 
 def client(tmp_path, docker=None, env=None, **config):
     config = Config(notify_urls=["discord://1/a"], data_dir=tmp_path, **config)
-    return TestClient(create_app(config, docker or FakeDocker([]), env or {}))
+    docker = docker or FakeDocker([])
+    return TestClient(create_app(config, lambda host: docker, env or {}))
 
 
 def sent(title, summary="**Verdict:** Safe to update", link=None):
@@ -296,6 +298,22 @@ def test_secrets_are_write_only(tmp_path):
     assert not any("sk-new" in c.get(path).text for path in ("/", "/containers", "/settings", "/login"))
     c.post("/settings", data={"csrf": token, "clear_llm_api_key": "on"})
     assert read_settings(tmp_path) == {}
+
+
+def test_pages_go_by_the_settings_in_use(tmp_path):
+    save(tmp_path, schedule="0 3 * * *", docker_host="tcp://socket-proxy:2375", include_label="tldr")
+    hosts, docker = [], FakeDocker([])
+
+    def connect(host):
+        hosts.append(host)
+        return docker
+
+    c = TestClient(create_app(Config(notify_urls=["x"], data_dir=tmp_path), connect, environment(tmp_path)))
+    assert "<code>0 3 * * *</code>, Europe/London" in c.get("/").text
+    c.get("/containers")
+    c.get("/containers")
+    assert hosts == ["tcp://socket-proxy:2375"]  # one client, kept while the host stays the same
+    assert docker.filters == [("tldr", None), ("tldr", None)]
 
 
 def test_broken_saved_settings_are_shown(tmp_path):

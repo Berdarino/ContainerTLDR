@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +18,7 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from ..config import Config, ConfigError, read_settings, write_settings
+from ..config import Config, ConfigError, load, read_settings, write_settings
 from ..discovery import Docker, ImageGroup
 from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
@@ -56,31 +56,45 @@ class Row:
         return nothing_to_link or no_version or self.guessed
 
 
-def create_app(config: Config, docker: Docker | None = None, env: Mapping[str, str] = os.environ) -> Starlette:
-    """The web UI. It reads what the scheduled checks leave in the data dir, so a page never waits for a check."""
-    tz = ZoneInfo(config.tz)
+def create_app(
+    config: Config, docker: Callable[[str], Docker] = Docker, env: Mapping[str, str] = os.environ
+) -> Starlette:
+    """The web UI. It reads what the scheduled checks leave in the data dir, so a page never waits for a check.
+
+    config is what the process started with. Pages go by the settings in use now, which can have been saved since.
+    """
     templates = Jinja2Templates(HERE / "templates", context_processors=[page_context])
-    templates.env.filters["local"] = lambda iso: datetime.fromisoformat(iso).astimezone(tz).strftime("%Y-%m-%d %H:%M")
-    docker = docker or Docker(config.docker_host)
+    templates.env.filters["local"] = _local
     mappings = load_mappings()
+    clients: dict[str, Docker] = {}  # by Docker host, so a client is kept until the host is changed
+
+    def current() -> Config:
+        try:
+            return load(env, read_settings(config.data_dir))
+        except ConfigError:  # the settings page shows what's wrong
+            return config
 
     def status(request: Request) -> Response:
+        in_use = current()
         entries = State.load(config.data_dir / "state.json", readonly=True).entries.values()
         context = {
             "last": _read_json(config.data_dir / "last_run.json"),
             "heartbeat": _read_json(config.data_dir / "heartbeat.json"),
-            "schedule": config.schedule,
-            "tz": config.tz,
+            "schedule": in_use.schedule,
+            "tz": in_use.tz,
             "pending": sorted((e for e in entries if e.message), key=lambda e: e.at, reverse=True),
         }
         return templates.TemplateResponse(request, "status.html", context)
 
     def containers(request: Request) -> Response:
+        in_use = current()
+        if in_use.docker_host not in clients:
+            clients[in_use.docker_host] = docker(in_use.docker_host)
         # Only the Docker API: registry and GitHub calls would cost rate limit on every page load
         try:
-            groups = docker.running(config.include_label, config.exclude_label)
+            groups = clients[in_use.docker_host].running(in_use.include_label, in_use.exclude_label)
         except httpx.HTTPError as e:
-            error = f"Can't reach Docker at {config.docker_host}: {e}"
+            error = f"Can't reach Docker at {in_use.docker_host}: {e}"
             return templates.TemplateResponse(request, "containers.html", {"error": error})
         entries = State.load(config.data_dir / "state.json", readonly=True).entries
         rows = sorted((_row(g, mappings, entries) for g in groups), key=lambda r: r.group.containers)
@@ -154,6 +168,10 @@ def _row(group: ImageGroup, mappings: dict[str, dict], entries: dict[str, Entry]
     except ValueError as e:
         return Row(group, None, None, entry, str(e))
     return Row(group, upstream, read_version(group.local.config, upstream.version), entry)
+
+
+def _local(iso: str, tz: str) -> str:
+    return datetime.fromisoformat(iso).astimezone(ZoneInfo(tz)).strftime("%Y-%m-%d %H:%M")
 
 
 def _read_json(path: Path) -> dict | None:

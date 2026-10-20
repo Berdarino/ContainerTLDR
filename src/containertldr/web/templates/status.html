@@ -4,7 +4,7 @@
 <h2>Checks</h2>
 <dl>
   {% if last %}
-  <dt>Last check</dt><dd>{{ last.finished | local }}</dd>
+  <dt>Last check</dt><dd>{{ last.finished | local(tz) }}</dd>
   <dt>Updates</dt><dd>{{ last.updates }}</dd>
   <dt>Rebuilds</dt><dd>{{ last.rebuilds }}</dd>
   <dt>Baselined</dt><dd>{{ last.baselined }}</dd>
@@ -12,7 +12,7 @@
   {% else %}
   <dt>Last check</dt><dd>None has finished yet</dd>
   {% endif %}
-  <dt>Next check</dt><dd>{{ heartbeat.next_check | local if heartbeat else "Not scheduled yet" }}</dd>
+  <dt>Next check</dt><dd>{{ heartbeat.next_check | local(tz) if heartbeat else "Not scheduled yet" }}</dd>
   <dt>Schedule</dt><dd><code>{{ schedule }}</code>, {{ tz }}</dd>
 </dl>
 {% if last and last.errors %}

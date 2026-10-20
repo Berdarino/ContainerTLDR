@@ -133,7 +133,7 @@ def test_repr_hides_secrets(tmp_path):
     assert not any(secret in repr(c) for secret in ("AbC-token", *secrets.values()))
 
 
-def test_registry_credentials(tmp_path):
+def test_registry_credentials(tmp_path, caplog):
     path = tmp_path / "config.json"
     path.write_text(
         json.dumps(
@@ -154,6 +154,7 @@ def test_registry_credentials(tmp_path):
         "registry.lan:5000": ("admin", "pa:ss"),
     }
     assert config(tmp_path, CTLDR_NOTIFY_URLS=DISCORD).registry_credentials["ghcr.io"] == ("me", "ghp_pat")
+    assert caplog.text.count("uses a credential helper") == 1  # read twice, said once
 
 
 def test_broken_docker_config(tmp_path):

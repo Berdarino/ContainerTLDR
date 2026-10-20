@@ -1,4 +1,5 @@
 import base64
+import functools
 import json
 import logging
 import os
@@ -145,7 +146,7 @@ def registry_credentials(path: Path) -> dict[str, tuple[str, str]]:
         return {}
     data = json.loads(path.read_text())
     if data.get("credsStore") or data.get("credHelpers"):
-        log.warning("%s uses a credential helper, which isn't supported; only its auths entries are read", path)
+        _warn_once(f"{path} uses a credential helper, which isn't supported; only its auths entries are read")
     credentials = {}
     for registry, entry in (data.get("auths") or {}).items():
         if entry.get("auth"):
@@ -157,6 +158,12 @@ def registry_credentials(path: Path) -> dict[str, tuple[str, str]]:
         host = re.sub(r"^https?://", "", registry).split("/")[0]  # "https://index.docker.io/v1/" -> index.docker.io
         credentials[API_HOSTS.get(host, host)] = (username, password)
     return credentials
+
+
+@functools.cache
+def _warn_once(message: str) -> None:
+    # Settings are loaded again before every check and for web pages, which shouldn't repeat this each time
+    log.warning(message)
 
 
 class _Reader:
