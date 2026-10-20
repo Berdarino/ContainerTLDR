@@ -75,6 +75,18 @@ def test_labels_alone_configure_an_unknown_image():
     assert upstream == Upstream("me/tool", "env:TOOL_VERSION", commits=True, found_by="label")
 
 
+def test_fixes_saved_in_the_web_ui():
+    fixes = {"ghcr.io/linuxserver/radarr": {"tag_prefix": "v"}, "ghcr.io/someone/app": {"repo": "someone/app-server"}}
+    # A fix sets what it says; the built-in default still gives the rest
+    radarr = resolve(parse_ref("lscr.io/linuxserver/radarr:latest"), {}, LSIO_SOURCE, MAPPINGS, fixes)
+    assert radarr == Upstream("Radarr/Radarr", tag_prefix="v", found_by="mappings")
+    # It comes before the guesses, and a label comes before it
+    app = parse_ref("ghcr.io/someone/app:latest")
+    assert resolve(app, {}, None, MAPPINGS, fixes) == Upstream("someone/app-server", found_by="fix")
+    labelled = resolve(app, {"containertldr.repo": "me/fork"}, None, MAPPINGS, fixes)
+    assert (labelled.repo, labelled.found_by) == ("me/fork", "label")
+
+
 @pytest.mark.parametrize(
     "labels, error",
     [

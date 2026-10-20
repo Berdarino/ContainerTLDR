@@ -32,19 +32,25 @@ class Upstream:
 
 
 def load_mappings(path: Path = MAPPINGS) -> dict[str, dict]:
-    return {_key(name): entry for name, entry in yaml.safe_load(path.read_text()).items()}
+    return {image_key(name): entry for name, entry in yaml.safe_load(path.read_text()).items()}
 
 
 def resolve(
-    image: ImageRef, labels: dict[str, str], image_labels: dict[str, str] | None, mappings: dict[str, dict]
+    image: ImageRef,
+    labels: dict[str, str],
+    image_labels: dict[str, str] | None,
+    mappings: dict[str, dict],
+    fixes: dict[str, dict] | None = None,
 ) -> Upstream:
     """Where an image's release notes are and how to read its version.
 
-    labels are the containertldr.* labels on its containers, image_labels the image's own. The repo comes from
-    the containertldr.repo label, then the built-in mappings, then the image's OCI source label, then its
-    ghcr.io path. Raises ValueError for a label it doesn't understand, so typos don't go unnoticed.
+    labels are the containertldr.* labels on its containers, image_labels the image's own, fixes what was saved
+    for images in the web UI. Each field comes from a label, then a fix, then the built-in mappings; the repo
+    then from the image's OCI source label, then its ghcr.io path. Raises ValueError for a label it doesn't
+    understand, so typos don't go unnoticed.
     """
-    entry = dict(mappings.get(_key(image.name), {}))
+    fix = (fixes or {}).get(image_key(image.name), {})
+    entry = {**mappings.get(image_key(image.name), {}), **fix}
     for key, value in labels.items():
         name = key.removeprefix(LABEL_PREFIX)
         if name in LABELS:
@@ -52,7 +58,7 @@ def resolve(
         elif name != "enable":
             known = ", ".join(LABEL_PREFIX + n for n in ["enable", *LABELS])
             raise ValueError(f"unknown label {key}, expected one of {known}")
-    found_by = "label" if LABEL_PREFIX + "repo" in labels else "mappings"
+    found_by = "label" if LABEL_PREFIX + "repo" in labels else "fix" if "repo" in fix else "mappings"
     if "repo" not in entry:  # an explicit repo: null in the mappings means there's nothing to guess
         entry["repo"], found_by = _guess_repo(image, image_labels or {})
 
@@ -78,7 +84,7 @@ def _guess_repo(image: ImageRef, image_labels: dict[str, str]) -> tuple[str | No
     return None, "none"
 
 
-def _key(name: str) -> str:
-    # Docker Hub names in their short form, and lscr.io under ghcr.io since it's the same registry
+def image_key(name: str) -> str:
+    """How mappings and fixes name an image: Docker Hub names short, and lscr.io under ghcr.io, the same registry."""
     name = parse_ref(name).name
     return "ghcr.io/" + name.removeprefix("lscr.io/") if name.startswith("lscr.io/") else name
