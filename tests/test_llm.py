@@ -1,9 +1,11 @@
 import json
+from dataclasses import replace
 
 import httpx
 import pytest
 
-from containertldr.llm import UNAVAILABLE, Ollama, OpenAICompatible, Summary, summarise
+from containertldr.config import Config
+from containertldr.llm import UNAVAILABLE, Ollama, OpenAICompatible, Summary, llm_for, summarise
 
 REPLY = "**Breaking / action needed:** None mentioned\n**Verdict:** Safe to update"
 
@@ -68,3 +70,10 @@ def test_failures_still_give_a_summary(response, error):
     summary = summarise(Ollama("http://ollama:11434", "qwen3:8b", transport=answering(response)), "a", "1", "2", "")
     assert (summary.text, summary.model) == (UNAVAILABLE, None)
     assert summary.error.startswith(error)
+
+
+def test_llm_for():
+    config = Config(notify_urls=["x"])
+    assert isinstance(llm_for(config), Ollama)
+    assert isinstance(llm_for(replace(config, llm_provider="openai_compat")), OpenAICompatible)
+    assert llm_for(replace(config, llm_provider="none")) is None

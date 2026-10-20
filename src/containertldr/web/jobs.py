@@ -8,7 +8,20 @@ import httpx
 from ..config import Config
 from ..discovery import Docker
 from ..github import GitHub
+from ..llm import llm_for, summarise
 from ..notify import Notifier
+
+# Made up, with one breaking change, to see whether the model finds it
+SAMPLE_NOTES = """\
+## v2.4.0
+- Added a dark theme
+- Fixed a crash when a library path contains spaces
+- PostgreSQL 13 is no longer supported, upgrade to 15 or newer before updating
+"""
+
+
+class Failed(Exception):
+    """A test that didn't work, with a message that says why on its own."""
 
 
 @dataclass
@@ -43,7 +56,7 @@ def _run(job: Job, work: Callable[[], str], secrets: list[str]) -> None:
     try:
         job.result = work()
     except Exception as e:
-        error = f"{type(e).__name__}: {e}"
+        error = str(e) if isinstance(e, Failed) else f"{type(e).__name__}: {e}"
         for secret in secrets:  # an error from a library could quote a URL with a token in it
             error = error.replace(secret, "[hidden]")
         job.error = error
@@ -66,6 +79,16 @@ def try_notify(config: Config, transport: httpx.BaseTransport | None = None) -> 
     sent = notifier.test()  # NotifyError if none took it
     rest = "" if sent == targets else ", see the log for the rest"
     return f"Sent to {sent} of {targets} notification targets{rest}."
+
+
+def try_llm(config: Config, transport: httpx.BaseTransport | None = None) -> str:
+    llm = llm_for(config, transport)
+    if llm is None:
+        return "CTLDR_LLM_PROVIDER is none, so updates come with the first lines of their release notes instead."
+    summary = summarise(llm, "example", "2.3.1", "2.4.0", SAMPLE_NOTES)
+    if summary.error:
+        raise Failed(f"{config.llm_model} at {config.llm_url} gave no summary: {summary.error}")
+    return f"{summary.model} summarised a made-up release:\n\n{summary.text}"
 
 
 def try_github(config: Config, transport: httpx.BaseTransport | None = None) -> str:

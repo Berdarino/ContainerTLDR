@@ -3,6 +3,7 @@ import json
 import re
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import httpx
@@ -16,7 +17,7 @@ from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
-from containertldr.web.jobs import Jobs, try_github, try_notify
+from containertldr.web.jobs import Jobs, try_github, try_llm, try_notify
 
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
@@ -367,6 +368,18 @@ def test_testing_notifications(monkeypatch):
     transport = httpx.MockTransport(lambda r: httpx.Response(404 if "/gone" in r.url.path else 204))
     config = Config(notify_urls=["discord://1/works", "discord://2/gone"])
     assert try_notify(config, transport) == "Sent to 1 of 2 notification targets, see the log for the rest."
+
+
+def test_testing_the_llm():
+    config = Config(notify_urls=["x"])
+    reply = "**Breaking / action needed:** None mentioned\n**Verdict:** Safe to update"
+    answer = httpx.MockTransport(lambda request: httpx.Response(200, json={"message": {"content": reply}}))
+    assert try_llm(config, answer) == f"qwen3:8b summarised a made-up release:\n\n{reply}"
+    assert try_llm(replace(config, llm_provider="none")).startswith("CTLDR_LLM_PROVIDER is none")
+
+    jobs, down = Jobs(), httpx.MockTransport(lambda request: httpx.Response(500))
+    jobs.start("LLM", lambda: try_llm(config, down), secrets=[])
+    assert finished(jobs).error.startswith("qwen3:8b at http://ollama:11434 gave no summary: HTTPStatusError")
 
 
 def test_testing_the_github_token():

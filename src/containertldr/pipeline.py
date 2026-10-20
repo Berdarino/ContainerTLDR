@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from .config import Config
 from .discovery import Docker, ImageGroup
 from .github import GitHub, GitHubError
-from .llm import Ollama, OpenAICompatible, summarise
+from .llm import Ollama, OpenAICompatible, llm_for, summarise
 from .messages import Rebuild, Update
 from .notes import brief_notes, build_notes
 from .notify import Notifier, NotifyError
@@ -69,17 +69,12 @@ class Checker:
 
     @classmethod
     def from_config(cls, config: Config, dry_run: bool = False) -> "Checker":
-        llm: Ollama | OpenAICompatible | None = None
-        if config.llm_provider == "ollama":
-            llm = Ollama(config.llm_url, config.llm_model, config.llm_num_ctx)
-        elif config.llm_provider == "openai_compat":
-            llm = OpenAICompatible(config.llm_url, config.llm_model, config.llm_api_key)
         return cls(
             config,
             Docker(config.docker_host),
             Registry(config.registry_credentials, config.insecure_registries),
             GitHub(config.github_token, config.github_url),
-            llm,
+            llm_for(config),
             Notifier(config.notify_urls, dry_run=dry_run),
             State.load(config.data_dir / "state.json", readonly=dry_run),
             load_mappings(),

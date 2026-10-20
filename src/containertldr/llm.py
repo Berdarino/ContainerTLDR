@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from .config import Config
 from .prompt import build_messages, clean_reply
 
 MAX_TOKENS = 600  # the reply format needs about 250; this stops a model that rambles
@@ -71,6 +72,15 @@ class OpenAICompatible:
         )
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
+
+
+def llm_for(config: Config, transport: httpx.BaseTransport | None = None) -> Ollama | OpenAICompatible | None:
+    """The model the settings name, or None when CTLDR_LLM_PROVIDER is none."""
+    if config.llm_provider == "ollama":
+        return Ollama(config.llm_url, config.llm_model, config.llm_num_ctx, transport=transport)
+    if config.llm_provider == "openai_compat":
+        return OpenAICompatible(config.llm_url, config.llm_model, config.llm_api_key, transport=transport)
+    return None
 
 
 def summarise(llm: Ollama | OpenAICompatible, app: str, current: str, new: str, notes: str) -> Summary:
