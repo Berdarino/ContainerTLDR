@@ -7,10 +7,18 @@ requires-python = ">=3.12"
 authors = [{ name = "Berdarino", email = "contact@bernardwong.dev" }]
 dependencies = [
     "apprise>=2.0.1",
+    "croniter>=6.2.4",
     "httpx>=0.28.1",
     "packaging>=26.3",
     "pyyaml>=6.0.3",
+    "tzdata>=2026.5",
 ]
+
+[project.urls]
+Source = "https://github.com/Berdarino/ContainerTLDR"
+
+[project.scripts]
+containertldr = "containertldr.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.12.12,<0.13.0"]
@@ -27,3 +35,6 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["ignore:'imghdr' is deprecated:DeprecationWarning"]  # inside Apprise, not ours

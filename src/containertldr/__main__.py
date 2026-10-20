@@ -1,0 +1,134 @@
+import argparse
+import json
+import logging
+import os
+import signal
+import sys
+import time
+from datetime import UTC, datetime, timedelta
+from importlib.metadata import version
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from croniter import croniter
+
+from .config import Config, ConfigError, load
+from .notify import Notifier
+from .pipeline import Checker, RunResult
+
+log = logging.getLogger("containertldr")
+
+HEARTBEAT = "heartbeat.json"
+# How late a check may finish before the healthcheck fails; many summaries on a slow GPU take a while
+GRACE = timedelta(hours=2)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="containertldr",
+        description="Container update notifications with an LLM summary of the upstream release notes.",
+    )
+    parser.add_argument("command", nargs="?", choices=["healthcheck"], help="exit 1 if the scheduled check is overdue")
+    parser.add_argument("--once", action="store_true", help="run one check now and exit, instead of on the schedule")
+    parser.add_argument("--dry-run", action="store_true", help="print notifications instead of sending, save nothing")
+    parser.add_argument("--test", metavar="CONTAINER", help="post a [TEST] summary of CONTAINER's last few releases")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {version('containertldr')}")
+    args = parser.parse_args(argv)
+
+    if args.command == "healthcheck":
+        return healthcheck(Path(os.environ.get("CTLDR_DATA_DIR", "/data")))
+
+    try:
+        config = load()
+        next_check(config, datetime.now(UTC))
+    except ConfigError as e:
+        print(f"containertldr can't start:\n{e}", file=sys.stderr)
+        return 2
+    if not args.dry_run and not args.test:
+        try:
+            config.data_dir.mkdir(parents=True, exist_ok=True)
+            (config.data_dir / ".write-test").touch()
+            (config.data_dir / ".write-test").unlink()
+        except OSError as e:
+            print(f"containertldr can't write to {config.data_dir}: {e.strerror}.", file=sys.stderr)
+            print(f"The data volume has to be writable by uid {os.getuid()}.", file=sys.stderr)
+            return 2
+
+    logging.basicConfig(level=config.log_level.upper(), format="%(asctime)s %(levelname)s %(message)s", force=True)
+    for noisy in ("httpx", "httpcore"):  # they log request URLs, and webhook URLs contain tokens
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    log.info("containertldr %s: %s", version("containertldr"), config)
+
+    if args.test:
+        try:
+            Checker.from_config(config, args.dry_run).test(args.test)
+        except Exception as e:
+            log.error("test failed: %s", e)
+            return 1
+        return 0
+    if args.once:
+        result = check(config, args.dry_run)
+        return 0 if result and not result.errors else 1
+
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # as PID 1 in a container, SIGTERM is ignored otherwise
+    follow_schedule(config, args.dry_run)
+    return 0
+
+
+def check(config: Config, dry_run: bool) -> RunResult | None:
+    """One run. None if it failed as a whole, e.g. Docker was unreachable, which it also tries to report."""
+    try:
+        result = Checker.from_config(config, dry_run).run()
+    except Exception as e:
+        log.exception("check failed")
+        try:
+            Notifier(config.notify_urls, dry_run=dry_run).errors([f"the whole check failed: {type(e).__name__}: {e}"])
+        except Exception as notify_error:
+            log.error("couldn't report that either: %s", notify_error)
+        return None
+    log.info(
+        "check done: %d update(s), %d rebuild(s), %d baselined, %d error(s)",
+        result.updates,
+        result.rebuilds,
+        result.baselined,
+        len(result.errors),
+    )
+    return result
+
+
+def follow_schedule(config: Config, dry_run: bool) -> None:
+    tz = ZoneInfo(config.tz)
+    while True:
+        due = next_check(config, datetime.now(tz))
+        write_heartbeat(config.data_dir, due)
+        log.info("next check at %s", due.strftime("%Y-%m-%d %H:%M %Z"))
+        while (wait := (due - datetime.now(tz)).total_seconds()) > 0:
+            time.sleep(min(wait, 60))  # short naps, so a host that was suspended doesn't oversleep
+        check(config, dry_run)
+
+
+def next_check(config: Config, after: datetime) -> datetime:
+    if not croniter.is_valid(config.schedule):
+        raise ConfigError(f"CTLDR_SCHEDULE should be a cron expression like '30 4 * * *', not {config.schedule!r}")
+    return croniter(config.schedule, after).get_next(datetime)
+
+
+def write_heartbeat(data_dir: Path, due: datetime) -> None:
+    (data_dir / HEARTBEAT).write_text(json.dumps({"next_check": due.isoformat()}) + "\n")
+
+
+def healthcheck(data_dir: Path) -> int:
+    """0 unless the next check is overdue. The schedule loop writes when that is before it starts waiting."""
+    try:
+        due = datetime.fromisoformat(json.loads((data_dir / HEARTBEAT).read_text())["next_check"])
+    except (OSError, ValueError, KeyError):
+        print("no heartbeat yet")
+        return 1
+    if datetime.now(UTC) > due + GRACE:
+        print(f"the check due at {due:%Y-%m-%d %H:%M %Z} hasn't finished")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
