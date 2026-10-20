@@ -126,10 +126,13 @@ services:
       containertldr.tag-prefix: "@example/app@"
 ```
 
-Without a label, the repo comes from a short list of built-in defaults for popular images whose own labels point
-at the wrong place (LinuxServer's, for example), then from the image's `org.opencontainers.image.source` label,
-then from its `ghcr.io/owner/name` path. When the repo was guessed, the notification says so, and the
-[web UI](#web-ui) highlights it.
+The [web UI](#web-ui) can set the same fields for an image, for every container that runs it, without touching
+the compose file. A label still wins over that.
+
+Without a label, the repo comes from a fix made in the web UI, then from a short list of built-in defaults for
+popular images whose own labels point at the wrong place (LinuxServer's, for example), then from the image's
+`org.opencontainers.image.source` label, then from its `ghcr.io/owner/name` path. When the repo was guessed, the
+notification says so, and the web UI highlights it.
 
 ## Web UI
 
@@ -140,7 +143,10 @@ UI:
   were reported but aren't deployed yet, with their summaries.
 - Containers: how the next check will read each running image: where its release notes come from and how that was
   found, its version, and the `containertldr.*` labels in effect. Rows where the repo was guessed, or where no
-  repo or version was found, are highlighted. Those probably need a label.
+  repo or version was found, are highlighted. Those probably need a label or a fix.
+- An image's page: fix how it's read (the same fields as the labels, with what ContainerTLDR would do otherwise
+  shown greyed out), and send a `[TEST]` summary for one of its containers to check the fix. Only with
+  `CTLDR_WEB_PASSWORD`.
 - Settings: the settings from the table above, to change and save, and buttons that test notifications, the LLM,
   Docker and the GitHub token. Only with `CTLDR_WEB_PASSWORD`.
 
@@ -150,8 +156,8 @@ password, every page asks for it.
 
 On the settings page, a setting that an environment variable sets (plain `TZ` included) is shown but can't be
 changed, so a compose file in git keeps working as it is. An empty field means the default. Secrets can be replaced
-or cleared but are never shown. Saved settings are kept in `/data/settings.json` and apply from the next check,
-without a restart. The test buttons use the saved settings.
+or cleared but are never shown. Saved settings and fixes are kept in `/data/settings.json` and apply from the next
+check, without a restart. The test buttons use what's saved.
 
 The pages only read the Docker API and what the checks saved, so opening them costs no registry or GitHub rate
 limit.
