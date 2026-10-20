@@ -34,6 +34,21 @@ nav a {
   margin-right: 1rem;
 }
 
+.logout {
+  margin-left: auto;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.stacked {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 20rem;
+}
+
 h2 {
   font-size: 1.15rem;
   margin-top: 2rem;

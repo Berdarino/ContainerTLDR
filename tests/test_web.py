@@ -1,8 +1,10 @@
+import re
 from datetime import UTC, datetime
 
 import httpx
 from starlette.testclient import TestClient
 
+from containertldr import web
 from containertldr.__main__ import write_heartbeat, write_last_run
 from containertldr.config import Config
 from containertldr.discovery import ImageGroup, LocalImage
@@ -14,6 +16,7 @@ from containertldr.web import create_app
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
 FOOTER = "Summarised by qwen3:8b from 1 release note"
+PASSWORD = "correct horse battery staple"
 
 
 class FakeDocker:
@@ -153,3 +156,71 @@ def test_stylesheet(tmp_path):
     response = client(tmp_path).get("/static/style.css")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")
+
+
+def csrf(page):
+    return re.search(r'name="csrf" value="([^"]+)"', page.text)[1]
+
+
+def logged_in(tmp_path, **config):
+    c = client(tmp_path, web_password=PASSWORD, **config)
+    c.post("/login", data={"csrf": csrf(c.get("/login")), "password": PASSWORD})
+    return c
+
+
+def test_without_a_password_there_is_no_login(tmp_path):
+    c = client(tmp_path)
+    page = c.get("/")
+    assert page.status_code == 200 and "set-cookie" not in page.headers
+    assert c.get("/login").status_code == 404
+
+
+def test_with_a_password_every_page_needs_a_login(tmp_path):
+    c = client(tmp_path, web_password=PASSWORD)
+    for path in ("/", "/containers"):
+        response = c.get(path, follow_redirects=False)
+        assert (response.status_code, response.headers["location"]) == (303, "/login")
+    assert c.get("/static/style.css").status_code == 200
+    assert "Log out" not in c.get("/login").text
+
+
+def test_login_and_logout(tmp_path):
+    c = client(tmp_path, web_password=PASSWORD)
+    response = c.post("/login", data={"csrf": csrf(c.get("/login")), "password": PASSWORD}, follow_redirects=False)
+    assert (response.status_code, response.headers["location"]) == (303, "/")
+    cookie = response.headers["set-cookie"].lower()
+    assert cookie.startswith("containertldr=") and "httponly" in cookie and "samesite=strict" in cookie
+    page = c.get("/")
+    assert page.status_code == 200 and "Log out" in page.text and PASSWORD not in page.text
+    c.post("/logout", data={"csrf": csrf(page)})
+    assert c.get("/", follow_redirects=False).status_code == 303
+
+
+def test_wrong_password(tmp_path, monkeypatch):
+    monkeypatch.setattr(web, "FAILED_LOGIN_DELAY", 0)
+    c = client(tmp_path, web_password=PASSWORD)
+    response = c.post("/login", data={"csrf": csrf(c.get("/login")), "password": "hunter2"})
+    assert response.status_code == 401 and "Wrong password." in response.text
+    assert c.get("/", follow_redirects=False).status_code == 303
+
+
+def test_forms_from_elsewhere_are_refused(tmp_path):
+    c = client(tmp_path, web_password=PASSWORD)
+    token = csrf(c.get("/login"))
+    assert c.post("/login", data={"password": PASSWORD}).status_code == 403
+    assert c.post("/login", data={"csrf": "a guess", "password": PASSWORD}).status_code == 403
+    form = {"csrf": token, "password": PASSWORD}
+    assert c.post("/login", data=form, headers={"origin": "https://evil.example"}).status_code == 403
+    proxied = {"origin": "https://tldr.example", "x-forwarded-host": "tldr.example"}
+    assert c.post("/login", data=form, headers=proxied, follow_redirects=False).status_code == 303
+
+
+def test_a_new_password_logs_everyone_out(tmp_path):
+    session = logged_in(tmp_path).cookies
+    assert oct((tmp_path / "session.key").stat().st_mode & 0o777) == "0o600"
+    restarted = client(tmp_path, web_password=PASSWORD)
+    restarted.cookies = session
+    assert restarted.get("/", follow_redirects=False).status_code == 200  # a restart doesn't log anyone out
+    changed = client(tmp_path, web_password="a new one")
+    changed.cookies = session
+    assert changed.get("/", follow_redirects=False).status_code == 303

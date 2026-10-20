@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -6,8 +8,10 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -17,8 +21,12 @@ from ..discovery import Docker, ImageGroup
 from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
+from .auth import RequireLogin, page_context, posted, same_password, session_key
+
+log = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent
+FAILED_LOGIN_DELAY = 1.0  # seconds, times the failed attempts in a row, up to ten
 
 
 @dataclass(frozen=True)
@@ -48,7 +56,7 @@ class Row:
 def create_app(config: Config, docker: Docker | None = None) -> Starlette:
     """The web UI. It reads what the scheduled checks leave in the data dir, so a page never waits for a check."""
     tz = ZoneInfo(config.tz)
-    templates = Jinja2Templates(HERE / "templates")
+    templates = Jinja2Templates(HERE / "templates", context_processors=[page_context])
     templates.env.filters["local"] = lambda iso: datetime.fromisoformat(iso).astimezone(tz).strftime("%Y-%m-%d %H:%M")
     docker = docker or Docker(config.docker_host)
     mappings = load_mappings()
@@ -75,8 +83,37 @@ def create_app(config: Config, docker: Docker | None = None) -> Starlette:
         rows = sorted((_row(g, mappings, entries) for g in groups), key=lambda r: r.group.containers)
         return templates.TemplateResponse(request, "containers.html", {"rows": rows})
 
+    attempts, failures = asyncio.Lock(), 0
+
+    async def login(request: Request) -> Response:
+        nonlocal failures
+        if request.method == "GET":
+            return templates.TemplateResponse(request, "login.html")
+        form = await posted(request)
+        async with attempts:  # one at a time, so the delay can't be waited out in parallel
+            if same_password(str(form.get("password", "")), config.web_password or ""):
+                failures = 0
+                request.session["login"] = True
+                return RedirectResponse("/", status_code=303)
+            failures += 1
+            log.warning("wrong web UI password from %s", request.client.host if request.client else "unknown")
+            await asyncio.sleep(min(failures, 10) * FAILED_LOGIN_DELAY)
+        return templates.TemplateResponse(request, "login.html", {"error": "Wrong password."}, status_code=401)
+
+    async def logout(request: Request) -> Response:
+        await posted(request)
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+
     static = StaticFiles(directory=HERE / "static")
-    return Starlette(routes=[Route("/", status), Route("/containers", containers), Mount("/static", static)])
+    routes = [Route("/", status), Route("/containers", containers), Mount("/static", static)]
+    if not config.web_password:
+        return Starlette(routes=routes)
+    routes += [Route("/login", login, methods=["GET", "POST"]), Route("/logout", logout, methods=["POST"])]
+    key = session_key(config.data_dir, config.web_password)
+    # A cookie name of its own: cookies are shared by every app on the same host, whatever the port
+    session = Middleware(SessionMiddleware, secret_key=key, session_cookie="containertldr", same_site="strict")
+    return Starlette(routes=routes, middleware=[session, Middleware(RequireLogin)])
 
 
 def _row(group: ImageGroup, mappings: dict[str, dict], entries: dict[str, Entry]) -> Row:

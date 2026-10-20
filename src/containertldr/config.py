@@ -19,8 +19,8 @@ PROVIDERS = ("ollama", "openai_compat", "none")
 INITIAL_RUNS = ("baseline", "notify")
 LOG_LEVELS = ("debug", "info", "warning", "error")
 SETTINGS = "settings.json"
-# Where the settings file is, and what the web UI listens on, can't be changed from the web UI itself
-ENV_ONLY = ("data_dir", "web_port", "web_host")
+# Where the settings file is, and how the web UI is reached, can't be changed from the web UI itself
+ENV_ONLY = ("data_dir", "web_port", "web_host", "web_password")
 
 
 class ConfigError(Exception):
@@ -52,13 +52,14 @@ class Config:
     log_level: str = "info"
     web_port: int | None = None  # no web UI, and no open port, unless it's set
     web_host: str = "0.0.0.0"
+    web_password: str | None = field(default=None, repr=False)  # without one, the settings pages stay off
 
 
 def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None = None) -> Config:
     """Settings from CTLDR_* environment variables, then from settings saved in the web UI, then the defaults.
 
-    Every problem is reported at once. Secrets (the notify URLs, the LLM key, GITHUB_TOKEN) can come from a file
-    named in <NAME>_FILE instead, for Docker secrets.
+    Every problem is reported at once. Secrets (the notify URLs, the LLM key, GITHUB_TOKEN, the web UI password)
+    can come from a file named in <NAME>_FILE instead, for Docker secrets.
     """
     saved = {k: v for k, v in (settings or {}).items() if k not in ENV_ONLY}
     read = _Reader(env, saved)
@@ -106,6 +107,7 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
         log_level=read.choice("LOG_LEVEL", "info", LOG_LEVELS),
         web_port=web_port,
         web_host=read.text("WEB_HOST", "0.0.0.0"),
+        web_password=read.secret(PREFIX + "WEB_PASSWORD"),
     )
     if read.problems:
         raise ConfigError("\n".join(read.problems))
