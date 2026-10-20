@@ -50,7 +50,8 @@ ContainerTLDR gives third-party release notes to an LLM, so a release note could
   `@channel` are broken up for other services.
 - The verdict is checked against the "Breaking / action needed" line in code, so a model that says "Safe to
   update" while a breaking change is listed gets overruled.
-- The web UI shows summaries as plain text, so HTML in a release note or in the model's reply is never rendered.
+- The web UI escapes a summary before it formats its bold text and lists, so HTML in a release note or in the
+  model's reply is never rendered.
 
 The worst a malicious release note can do is make its own summary wrong. For updates that matter, read the linked
 release notes too.

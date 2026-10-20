@@ -30,7 +30,7 @@
   <p class="muted">{{ entry.message.footer }}</p>
   <details>
     <summary>Summary</summary>
-    <div class="summary">{{ entry.message.summary }}</div>
+    <div class="summary">{{ entry.message.summary | markdown }}</div>
   </details>
 </article>
 {% else %}

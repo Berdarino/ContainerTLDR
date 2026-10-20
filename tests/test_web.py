@@ -19,6 +19,7 @@ from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
 from containertldr.web.jobs import Failed, Jobs, try_github, try_llm, try_notify, try_summary
+from containertldr.web.markdown import markdown
 
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
@@ -93,15 +94,25 @@ def test_pending_updates_newest_first(tmp_path):
     assert page.index("jellyfin: 10.11.1") < page.index("radarr: 6.4.4")
     assert f'<a href="{release}">⬆️ radarr: 6.4.4 → 6.4.5</a>' in page
     assert "redis" not in page
-    assert page.count(FOOTER) == 2 and page.count("**Verdict:** Safe to update") == 2
+    assert page.count(FOOTER) == 2 and page.count("<strong>Verdict:</strong> Safe to update") == 2
 
 
 def test_summaries_are_shown_as_text(tmp_path):
-    summary = '<script>alert("from the release notes")</script>'
+    summary = '**Highlights:** <script>alert("from the release notes")</script>\n- <img src=x onerror=alert(1)>'
     write_state(tmp_path, ("ghcr.io/someone/app:latest", "2026-10-20T04:31:00+00:00", sent("⬆️ app: 1 → 2", summary)))
     page = client(tmp_path).get("/").text
-    assert "<script>" not in page
-    assert "&lt;script&gt;" in page
+    assert "<script>" not in page and "<img" not in page
+    assert "<strong>Highlights:</strong> &lt;script&gt;" in page
+
+
+def test_markdown_in_summaries():
+    summary = "**Breaking:** None mentioned  \n**Highlights:**\n- Added a dark theme\n* Fixed a crash\n\n…"
+    assert markdown(summary) == (
+        "<p><strong>Breaking:</strong> None mentioned</p>\n"
+        "<p><strong>Highlights:</strong></p>\n"
+        "<ul>\n<li>Added a dark theme</li>\n<li>Fixed a crash</li>\n</ul>\n"
+        "<p>…</p>"
+    )
 
 
 def test_containers(tmp_path):

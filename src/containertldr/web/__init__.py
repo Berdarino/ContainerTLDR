@@ -30,6 +30,7 @@ from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
 from .fixes import FIELDS, LABEL_NAMES, defaults, fix_from, fix_problems, overridden
 from .jobs import Jobs, secrets_of, try_docker, try_github, try_llm, try_notify, try_summary
+from .markdown import markdown
 from .settings import form_rows, problems, updated
 
 log = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ def create_app(
     """
     templates = Jinja2Templates(HERE / "templates", context_processors=[page_context])
     templates.env.filters["local"] = _local
+    templates.env.filters["markdown"] = markdown
     mappings = load_mappings()
     clients: dict[str, Docker] = {}  # by Docker host, so a client is kept until the host is changed
 

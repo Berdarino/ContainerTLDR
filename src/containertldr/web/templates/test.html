@@ -9,10 +9,10 @@
 <p>{{ job.title }}: running. This page reloads until it's done.</p>
 {% elif job.error %}
 <p class="errors">{{ job.title }}: failed after {{ "%.1f" | format(job.took) }} s.</p>
-<div class="summary errors">{{ job.error }}</div>
+<div class="errors plain">{{ job.error }}</div>
 {% else %}
 <p class="ok">{{ job.title }}: OK ({{ "%.1f" | format(job.took) }} s).</p>
-<div class="summary">{{ job.result }}</div>
+<div class="summary">{{ job.result | markdown }}</div>
 {% endif %}
 <p><a href="/settings">Back to the settings</a> · <a href="/containers">Containers</a></p>
 {% endblock %}
