@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from croniter import croniter
+
 from .registry import API_HOSTS
 
 log = logging.getLogger(__name__)
@@ -83,7 +85,7 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
 
     config = Config(
         notify_urls=notify_urls,
-        schedule=read.text("SCHEDULE", "30 4 * * *"),
+        schedule=read.cron("SCHEDULE", "30 4 * * *"),
         tz=tz,
         docker_host=read.text("DOCKER_HOST", "unix:///var/run/docker.sock"),
         llm_provider=read.choice("LLM_PROVIDER", "ollama", PROVIDERS),
@@ -189,6 +191,13 @@ class _Reader:
         value = (self.text(name) or default).lower()
         if value not in choices:
             self.problems.append(f"{self._label(name)} should be one of {', '.join(choices)}, not {value!r}")
+            return default
+        return value
+
+    def cron(self, name: str, default: str) -> str:
+        value = self.text(name, default)
+        if not croniter.is_valid(value):
+            self.problems.append(f"{self._label(name)} should be a cron expression like '30 4 * * *', not {value!r}")
             return default
         return value
 

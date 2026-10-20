@@ -29,10 +29,11 @@ def test_reports_every_problem_at_once(tmp_path):
             CTLDR_LLM_NUM_CTX="8k",
             CTLDR_NOTIFY_REBUILDS="sometimes",
             CTLDR_INITIAL_RUN="all",
+            CTLDR_SCHEDULE="every day at 4",
             TZ="Mars/Olympus_Mons",
         )
     problems = str(error.value).splitlines()
-    assert len(problems) == 6
+    assert len(problems) == 7
     assert problems[0].startswith("CTLDR_NOTIFY_URLS is required")
     assert "CTLDR_LLM_PROVIDER should be one of ollama, openai_compat, none, not 'anthropic'" in problems
     assert any("CTLDR_LLM_NUM_CTX" in p for p in problems)

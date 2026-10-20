@@ -44,7 +44,6 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         config = load()
-        next_check(config, datetime.now(UTC))
     except ConfigError as e:
         print(f"containertldr can't start:\n{e}", file=sys.stderr)
         return 2
@@ -131,8 +130,6 @@ def follow_schedule(config: Config, dry_run: bool) -> None:
 
 
 def next_check(config: Config, after: datetime) -> datetime:
-    if not croniter.is_valid(config.schedule):
-        raise ConfigError(f"CTLDR_SCHEDULE should be a cron expression like '30 4 * * *', not {config.schedule!r}")
     return croniter(config.schedule, after).get_next(datetime)
 
 
