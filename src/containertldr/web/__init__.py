@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,12 +18,13 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from ..config import Config
+from ..config import Config, ConfigError, load, read_settings
 from ..discovery import Docker, ImageGroup
 from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
+from .settings import GROUPS, shown, source
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +56,7 @@ class Row:
         return nothing_to_link or no_version or self.guessed
 
 
-def create_app(config: Config, docker: Docker | None = None) -> Starlette:
+def create_app(config: Config, docker: Docker | None = None, env: Mapping[str, str] = os.environ) -> Starlette:
     """The web UI. It reads what the scheduled checks leave in the data dir, so a page never waits for a check."""
     tz = ZoneInfo(config.tz)
     templates = Jinja2Templates(HERE / "templates", context_processors=[page_context])
@@ -83,6 +86,17 @@ def create_app(config: Config, docker: Docker | None = None) -> Starlette:
         rows = sorted((_row(g, mappings, entries) for g in groups), key=lambda r: r.group.containers)
         return templates.TemplateResponse(request, "containers.html", {"rows": rows})
 
+    def settings(request: Request) -> Response:
+        if not config.web_password:  # the other pages are open then, so this one shows nothing
+            return templates.TemplateResponse(request, "settings.html", {"no_password": True})
+        try:
+            saved = read_settings(config.data_dir)
+            current = load(env, saved)
+        except ConfigError as e:
+            return templates.TemplateResponse(request, "settings.html", {"error": str(e)})
+        groups = {g: [(f, shown(f, current), source(f, env, saved)) for f in fields] for g, fields in GROUPS.items()}
+        return templates.TemplateResponse(request, "settings.html", {"groups": groups})
+
     attempts, failures = asyncio.Lock(), 0
 
     async def login(request: Request) -> Response:
@@ -106,7 +120,12 @@ def create_app(config: Config, docker: Docker | None = None) -> Starlette:
         return RedirectResponse("/login", status_code=303)
 
     static = StaticFiles(directory=HERE / "static")
-    routes = [Route("/", status), Route("/containers", containers), Mount("/static", static)]
+    routes = [
+        Route("/", status),
+        Route("/containers", containers),
+        Route("/settings", settings),
+        Mount("/static", static),
+    ]
     if not config.web_password:
         return Starlette(routes=routes)
     routes += [Route("/login", login, methods=["GET", "POST"]), Route("/logout", logout, methods=["POST"])]

@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import UTC, datetime
 
@@ -37,9 +38,9 @@ def group(ref, image_labels=None, container_labels=None, env=None):
     return ImageGroup(ref, image, local, [image.name.rsplit("/", 1)[-1]], ["media"], container_labels or {})
 
 
-def client(tmp_path, docker=None, **config):
-    app = create_app(Config(notify_urls=["discord://1/a"], data_dir=tmp_path, **config), docker or FakeDocker([]))
-    return TestClient(app)
+def client(tmp_path, docker=None, env=None, **config):
+    config = Config(notify_urls=["discord://1/a"], data_dir=tmp_path, **config)
+    return TestClient(create_app(config, docker or FakeDocker([]), env or {}))
 
 
 def sent(title, summary="**Verdict:** Safe to update", link=None):
@@ -213,6 +214,51 @@ def test_forms_from_elsewhere_are_refused(tmp_path):
     assert c.post("/login", data=form, headers={"origin": "https://evil.example"}).status_code == 403
     proxied = {"origin": "https://tldr.example", "x-forwarded-host": "tldr.example"}
     assert c.post("/login", data=form, headers=proxied, follow_redirects=False).status_code == 303
+
+
+def environment(tmp_path):
+    return {
+        "DOCKER_CONFIG": str(tmp_path),  # an empty folder, so the developer's own Docker logins stay out of it
+        "CTLDR_NOTIFY_URLS": "discord://123/AbC-token",
+        "CTLDR_LLM_URL": "http://ollama.lan:11434",
+        "TZ": "Europe/London",
+        "GITHUB_TOKEN": "ghp_secret",
+    }
+
+
+def save(data_dir, **settings):
+    (data_dir / "settings.json").write_text(json.dumps({"version": 1, "settings": settings}))
+
+
+def setting(page, variable):
+    """The text of one row on the settings page."""
+    row = re.search(rf"<code>{variable}</code>.*?</tr>", page, re.S)[0]
+    return " ".join(re.sub(r"<[^>]+>", " ", row).split())
+
+
+def test_settings_need_a_password_first(tmp_path):
+    page = client(tmp_path, env=environment(tmp_path)).get("/settings").text
+    assert "once a password is set with <code>CTLDR_WEB_PASSWORD</code>" in page
+    assert "ollama.lan" not in page
+
+
+def test_settings_show_where_each_value_comes_from(tmp_path):
+    save(tmp_path, llm_model="llama3.2", llm_url="http://saved:11434", llm_api_key="sk-saved")
+    page = logged_in(tmp_path, env=environment(tmp_path)).get("/settings").text
+    assert setting(page, "CTLDR_LLM_URL").endswith("http://ollama.lan:11434 set by CTLDR_LLM_URL")
+    assert setting(page, "CTLDR_LLM_MODEL").endswith("llama3.2 saved here")
+    assert setting(page, "CTLDR_SCHEDULE").endswith("30 4 * * * default")
+    assert setting(page, "CTLDR_TZ").endswith("Europe/London set by TZ")
+    assert setting(page, "CTLDR_INCLUDE_LABEL").endswith("not set default")
+    assert setting(page, "GITHUB_TOKEN").endswith("set set by GITHUB_TOKEN")
+    assert setting(page, "CTLDR_LLM_API_KEY").endswith("set saved here")
+    assert not any(secret in page for secret in ("AbC-token", "ghp_secret", "sk-saved", PASSWORD))
+
+
+def test_broken_saved_settings_are_shown(tmp_path):
+    save(tmp_path, llm_num_ctx="8k")
+    page = logged_in(tmp_path, env=environment(tmp_path)).get("/settings").text
+    assert "CTLDR_LLM_NUM_CTX (saved in the web UI) should be a positive whole number" in page
 
 
 def test_a_new_password_logs_everyone_out(tmp_path):

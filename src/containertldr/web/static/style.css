@@ -121,6 +121,14 @@ td code {
   overflow-wrap: anywhere;
 }
 
+main > h3 {
+  margin: 1.5rem 0 0.25rem;
+}
+
+.settings td:first-child {
+  width: 45%;
+}
+
 .summary {
   white-space: pre-wrap;
   margin-top: 0.5rem;

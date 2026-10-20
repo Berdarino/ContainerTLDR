@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block main %}
+<h2>Settings</h2>
+{% if no_password %}
+<p>Settings show up here, and can be changed, once a password is set with <code>CTLDR_WEB_PASSWORD</code> or
+<code>CTLDR_WEB_PASSWORD_FILE</code>. Until then they come from environment variables only.</p>
+{% elif error %}
+<p class="errors">The saved settings have a problem:</p>
+<pre class="errors">{{ error }}</pre>
+{% else %}
+<p class="muted">An environment variable wins over what's saved here, so a setting one of them sets can only be
+changed there.</p>
+{% for group, rows in groups.items() %}
+<h3>{{ group }}</h3>
+<div class="scroll">
+<table class="settings">
+  {% for field, value, origin in rows %}
+  <tr>
+    <td><code>{{ field.variables[0] }}</code>{% if field.help %}<div class="muted">{{ field.help }}</div>{% endif %}</td>
+    <td>{% if field.secret %}{{ value }}{% elif value %}<code>{{ value }}</code>{% else %}<span class="muted">not set</span>{% endif %}</td>
+    <td class="muted">{{ origin }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
