@@ -1,3 +1,4 @@
+import html
 import json
 import re
 from datetime import UTC, datetime
@@ -7,7 +8,7 @@ from starlette.testclient import TestClient
 
 from containertldr import web
 from containertldr.__main__ import write_heartbeat, write_last_run
-from containertldr.config import Config
+from containertldr.config import Config, load, read_settings
 from containertldr.discovery import ImageGroup, LocalImage
 from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
@@ -233,32 +234,74 @@ def save(data_dir, **settings):
 def setting(page, variable):
     """The text of one row on the settings page."""
     row = re.search(rf"<code>{variable}</code>.*?</tr>", page, re.S)[0]
-    return " ".join(re.sub(r"<[^>]+>", " ", row).split())
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", row)).split())
 
 
 def test_settings_need_a_password_first(tmp_path):
-    page = client(tmp_path, env=environment(tmp_path)).get("/settings").text
+    c = client(tmp_path, env=environment(tmp_path))
+    page = c.get("/settings").text
     assert "once a password is set with <code>CTLDR_WEB_PASSWORD</code>" in page
     assert "ollama.lan" not in page
+    c.post("/settings", data={"llm_model": "llama3.2"})
+    assert read_settings(tmp_path) == {}
 
 
-def test_settings_show_where_each_value_comes_from(tmp_path):
-    save(tmp_path, llm_model="llama3.2", llm_url="http://saved:11434", llm_api_key="sk-saved")
+def test_the_settings_form(tmp_path):
+    save(tmp_path, llm_model="llama3.2", llm_provider="openai_compat", llm_api_key="sk-saved")
     page = logged_in(tmp_path, env=environment(tmp_path)).get("/settings").text
     assert setting(page, "CTLDR_LLM_URL").endswith("http://ollama.lan:11434 set by CTLDR_LLM_URL")
-    assert setting(page, "CTLDR_LLM_MODEL").endswith("llama3.2 saved here")
-    assert setting(page, "CTLDR_SCHEDULE").endswith("30 4 * * * default")
     assert setting(page, "CTLDR_TZ").endswith("Europe/London set by TZ")
-    assert setting(page, "CTLDR_INCLUDE_LABEL").endswith("not set default")
     assert setting(page, "GITHUB_TOKEN").endswith("set set by GITHUB_TOKEN")
-    assert setting(page, "CTLDR_LLM_API_KEY").endswith("set saved here")
+    assert 'name="llm_url"' not in page  # set by the environment, so there's nothing to change here
+    assert 'name="llm_model" value="llama3.2" placeholder="qwen3:8b"' in page
+    assert 'name="schedule" value="" placeholder="30 4 * * *"' in page
+    assert "<option selected>openai_compat</option>" in page
+    assert 'placeholder="saved, type to replace"' in page and 'name="clear_llm_api_key"' in page
     assert not any(secret in page for secret in ("AbC-token", "ghp_secret", "sk-saved", PASSWORD))
+
+
+def test_saving_settings(tmp_path):
+    env = environment(tmp_path)
+    c = logged_in(tmp_path, env=env)
+    form = {"llm_model": "llama3.2", "llm_provider": "none", "schedule": "0 3 * * *", "llm_url": "http://elsewhere"}
+    response = c.post("/settings", data={"csrf": csrf(c.get("/settings")), **form}, follow_redirects=False)
+    assert (response.status_code, response.headers["location"]) == (303, "/settings?saved")
+    # llm_url is set by the environment, so the form can't change it
+    assert read_settings(tmp_path) == {"llm_model": "llama3.2", "llm_provider": "none", "schedule": "0 3 * * *"}
+    assert load(env, read_settings(tmp_path)).llm_model == "llama3.2"
+    assert oct((tmp_path / "settings.json").stat().st_mode & 0o777) == "0o600"
+    assert '<p class="ok">Saved.</p>' in c.get("/settings?saved").text
+    assert c.post("/settings", data=form).status_code == 403  # no token
+
+
+def test_invalid_settings_are_not_saved(tmp_path):
+    save(tmp_path, llm_model="llama3.2")
+    c = logged_in(tmp_path, env=environment(tmp_path))
+    form = {"llm_model": "mistral", "llm_num_ctx": "8k", "schedule": "daily", "llm_api_key": "sk-typed"}
+    response = c.post("/settings", data={"csrf": csrf(c.get("/settings")), **form})
+    assert response.status_code == 400
+    assert read_settings(tmp_path) == {"llm_model": "llama3.2"}
+    assert setting(response.text, "CTLDR_LLM_NUM_CTX").endswith("should be a positive whole number, not '8k'")
+    assert "a cron expression like '30 4 * * *', not 'daily'" in setting(response.text, "CTLDR_SCHEDULE")
+    assert 'name="llm_model" value="mistral"' in response.text  # what was typed stays
+    assert "sk-typed" not in response.text
+
+
+def test_secrets_are_write_only(tmp_path):
+    c = logged_in(tmp_path, env=environment(tmp_path))
+    token = csrf(c.get("/settings"))
+    c.post("/settings", data={"csrf": token, "llm_api_key": "sk-new"})
+    c.post("/settings", data={"csrf": token, "llm_api_key": ""})  # left empty, so it stays
+    assert read_settings(tmp_path) == {"llm_api_key": "sk-new"}
+    assert not any("sk-new" in c.get(path).text for path in ("/", "/containers", "/settings", "/login"))
+    c.post("/settings", data={"csrf": token, "clear_llm_api_key": "on"})
+    assert read_settings(tmp_path) == {}
 
 
 def test_broken_saved_settings_are_shown(tmp_path):
     save(tmp_path, llm_num_ctx="8k")
     page = logged_in(tmp_path, env=environment(tmp_path)).get("/settings").text
-    assert "CTLDR_LLM_NUM_CTX (saved in the web UI) should be a positive whole number" in page
+    assert "(set in the web UI) should be a positive whole number, not '8k'" in setting(page, "CTLDR_LLM_NUM_CTX")
 
 
 def test_a_new_password_logs_everyone_out(tmp_path):

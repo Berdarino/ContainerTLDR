@@ -6,24 +6,58 @@
 <p>Settings show up here, and can be changed, once a password is set with <code>CTLDR_WEB_PASSWORD</code> or
 <code>CTLDR_WEB_PASSWORD_FILE</code>. Until then they come from environment variables only.</p>
 {% elif error %}
-<p class="errors">The saved settings have a problem:</p>
+<p class="errors">The saved settings can't be read:</p>
 <pre class="errors">{{ error }}</pre>
 {% else %}
 <p class="muted">An environment variable wins over what's saved here, so a setting one of them sets can only be
-changed there.</p>
-{% for group, rows in groups.items() %}
-<h3>{{ group }}</h3>
-<div class="scroll">
-<table class="settings">
-  {% for field, value, origin in rows %}
-  <tr>
-    <td><code>{{ field.variables[0] }}</code>{% if field.help %}<div class="muted">{{ field.help }}</div>{% endif %}</td>
-    <td>{% if field.secret %}{{ value }}{% elif value %}<code>{{ value }}</code>{% else %}<span class="muted">not set</span>{% endif %}</td>
-    <td class="muted">{{ origin }}</td>
-  </tr>
+changed there. An empty field means the default. Changes apply from the next check.</p>
+{% if saved %}<p class="ok">Saved.</p>{% endif %}
+{% if other_problems %}
+<ul class="errors">
+  {% for problem in other_problems %}
+  <li>{{ problem }}</li>
   {% endfor %}
-</table>
-</div>
-{% endfor %}
+</ul>
+{% endif %}
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% for group, rows in groups.items() %}
+  <h3>{{ group }}</h3>
+  <div class="scroll">
+  <table class="settings">
+    {% for row in rows %}
+    {% set f = row.field %}
+    <tr>
+      <td>
+        <label for="{{ f.name }}"><code>{{ f.variables[0] }}</code></label>
+        {% if f.help %}<div class="muted">{{ f.help }}</div>{% endif %}
+      </td>
+      <td>
+        {% if row.locked_by %}
+        {% if f.secret %}set{% else %}<code>{{ row.value }}</code>{% endif %}
+        <div class="muted">set by {{ row.locked_by }}</div>
+        {% elif f.choices %}
+        <select id="{{ f.name }}" name="{{ f.name }}">
+          <option value="">default ({{ f.default }})</option>
+          {% for choice in f.choices %}
+          <option{% if choice == row.value %} selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+        {% elif f.secret %}
+        <input type="password" id="{{ f.name }}" name="{{ f.name }}" autocomplete="new-password"
+               placeholder="{{ 'saved, type to replace' if row.saved else 'not set' }}">
+        {% if row.saved %}<label class="muted"><input type="checkbox" name="clear_{{ f.name }}"> Clear</label>{% endif %}
+        {% else %}
+        <input id="{{ f.name }}" name="{{ f.name }}" value="{{ row.value }}" placeholder="{{ f.default }}">
+        {% endif %}
+        {% if row.problem %}<div class="errors">{{ row.problem }}</div>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% endfor %}
+  <p><button>Save</button></p>
+</form>
 {% endif %}
 {% endblock %}

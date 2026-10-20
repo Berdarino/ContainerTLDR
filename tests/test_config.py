@@ -109,7 +109,7 @@ def test_saved_settings_are_checked_the_same_way(tmp_path):
     saved = {"llm_num_ctx": "8k", "llm_provider": "anthropic"}
     with pytest.raises(ConfigError) as error:
         config(tmp_path, saved, CTLDR_NOTIFY_URLS=DISCORD, CTLDR_LLM_PROVIDER="ollama")
-    assert str(error.value) == "CTLDR_LLM_NUM_CTX (saved in the web UI) should be a positive whole number, not '8k'"
+    assert str(error.value) == "CTLDR_LLM_NUM_CTX (set in the web UI) should be a positive whole number, not '8k'"
 
 
 def test_some_settings_only_come_from_the_environment(tmp_path):

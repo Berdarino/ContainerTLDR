@@ -18,13 +18,13 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from ..config import Config, ConfigError, load, read_settings
+from ..config import Config, ConfigError, read_settings, write_settings
 from ..discovery import Docker, ImageGroup
 from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
-from .settings import GROUPS, shown, source
+from .settings import form_rows, problems, updated
 
 log = logging.getLogger(__name__)
 
@@ -86,16 +86,27 @@ def create_app(config: Config, docker: Docker | None = None, env: Mapping[str, s
         rows = sorted((_row(g, mappings, entries) for g in groups), key=lambda r: r.group.containers)
         return templates.TemplateResponse(request, "containers.html", {"rows": rows})
 
-    def settings(request: Request) -> Response:
+    async def settings(request: Request) -> Response:
         if not config.web_password:  # the other pages are open then, so this one shows nothing
             return templates.TemplateResponse(request, "settings.html", {"no_password": True})
         try:
             saved = read_settings(config.data_dir)
-            current = load(env, saved)
         except ConfigError as e:
             return templates.TemplateResponse(request, "settings.html", {"error": str(e)})
-        groups = {g: [(f, shown(f, current), source(f, env, saved)) for f in fields] for g, fields in GROUPS.items()}
-        return templates.TemplateResponse(request, "settings.html", {"groups": groups})
+        if request.method == "GET":
+            return settings_form(request, saved, problems(env, saved), saved="saved" in request.query_params)
+        new = updated(saved, await posted(request), env)
+        if found := problems(env, new):  # nothing is saved then, and the form keeps what was typed
+            return settings_form(request, new, found, status_code=400)
+        write_settings(config.data_dir, new)
+        log.info("settings saved in the web UI")
+        return RedirectResponse("/settings?saved", status_code=303)
+
+    def settings_form(request: Request, settings: dict, found: list[str], status_code=200, **context) -> Response:
+        groups = form_rows(env, settings, found)
+        placed = {row.problem for group in groups.values() for row in group}
+        context |= {"groups": groups, "other_problems": [p for p in found if p not in placed]}
+        return templates.TemplateResponse(request, "settings.html", context, status_code=status_code)
 
     attempts, failures = asyncio.Lock(), 0
 
@@ -123,7 +134,7 @@ def create_app(config: Config, docker: Docker | None = None, env: Mapping[str, s
     routes = [
         Route("/", status),
         Route("/containers", containers),
-        Route("/settings", settings),
+        Route("/settings", settings, methods=["GET", "POST"]),
         Mount("/static", static),
     ]
     if not config.web_password:

@@ -67,12 +67,6 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
     if not notify_urls:
         read.problems.append(f"{PREFIX}NOTIFY_URLS is required: one or more Apprise or Discord webhook URLs")
 
-    tz = env.get(PREFIX + "TZ") or env.get("TZ") or saved.get("tz") or "UTC"
-    try:
-        ZoneInfo(tz)
-    except (ZoneInfoNotFoundError, ValueError):
-        read.problems.append(f"unknown timezone {tz!r}, expected something like Europe/London")
-
     docker_config = Path(env.get("DOCKER_CONFIG") or Path.home() / ".docker") / "config.json"
     try:
         credentials = registry_credentials(docker_config)
@@ -87,7 +81,7 @@ def load(env: Mapping[str, str] = os.environ, settings: Mapping[str, str] | None
     config = Config(
         notify_urls=notify_urls,
         schedule=read.cron("SCHEDULE", "30 4 * * *"),
-        tz=tz,
+        tz=read.timezone(),
         docker_host=read.text("DOCKER_HOST", "unix:///var/run/docker.sock"),
         llm_provider=read.choice("LLM_PROVIDER", "ollama", PROVIDERS),
         llm_url=read.text("LLM_URL", "http://ollama:11434"),
@@ -128,6 +122,15 @@ def read_settings(data_dir: Path) -> dict[str, str]:
         return {}
     except (OSError, ValueError, KeyError) as e:
         raise ConfigError(f"can't read {path}: {e}") from e
+
+
+def write_settings(data_dir: Path, settings: Mapping[str, str]) -> None:
+    """Replaces the file in one go, readable by its owner only, since it can hold webhook URLs and tokens."""
+    path, tmp = data_dir / SETTINGS, data_dir / (SETTINGS + ".tmp")
+    tmp.unlink(missing_ok=True)  # so the mode below applies
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
+        f.write(json.dumps({"version": 1, "settings": dict(sorted(settings.items()))}, indent=2) + "\n")
+    os.replace(tmp, path)
 
 
 def split_urls(value: str) -> list[str]:
@@ -208,7 +211,18 @@ class _Reader:
             return default
         return value
 
+    def timezone(self) -> str:
+        # Plain TZ is set for the whole container, so it comes before a saved timezone as well
+        name = next((n for n in (PREFIX + "TZ", "TZ") if self.env.get(n)), None)
+        value = self.env[name] if name else self.settings.get("tz") or "UTC"
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            self.problems.append(f"{name or self._label('TZ')} should be a timezone like Europe/London, not {value!r}")
+            return "UTC"
+        return value
+
     def _label(self, name: str) -> str:
         if self.env.get(PREFIX + name) or name.lower() not in self.settings:
             return PREFIX + name
-        return f"{PREFIX}{name} (saved in the web UI)"  # so nobody goes looking for a variable they never set
+        return f"{PREFIX}{name} (set in the web UI)"  # so nobody goes looking for a variable they never set

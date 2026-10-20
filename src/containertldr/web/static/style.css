@@ -5,6 +5,7 @@
   --error: #b91c1c;
   --warn: #b45309;
   --fix: #f59e0b1a;
+  --ok: #15803d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -12,6 +13,7 @@
     --muted: #9ca3af;
     --error: #f87171;
     --warn: #fbbf24;
+    --ok: #4ade80;
   }
 }
 
@@ -127,6 +129,16 @@ main > h3 {
 
 .settings td:first-child {
   width: 45%;
+}
+
+.settings input:not([type="checkbox"]),
+.settings select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ok {
+  color: var(--ok);
 }
 
 .summary {
