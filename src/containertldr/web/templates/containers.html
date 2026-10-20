@@ -30,7 +30,10 @@
         <div><code>{{ key }}={{ value }}</code></div>
         {% endfor %}
       </td>
-      <td><code>{{ row.group.ref }}</code></td>
+      <td>
+        <code>{{ row.group.ref }}</code>
+        {% if logged_in %}<div><a href="/containers/{{ row.key }}">Change how it's read</a></div>{% endif %}
+      </td>
       {% if row.error %}
       <td colspan="2" class="warn">{{ row.error }}</td>
       {% else %}

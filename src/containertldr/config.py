@@ -128,6 +128,10 @@ def write_settings(data_dir: Path, settings: Mapping[str, str]) -> None:
     _write(data_dir, settings=dict(sorted(settings.items())))
 
 
+def write_fixes(data_dir: Path, fixes: Mapping[str, dict[str, str]]) -> None:
+    _write(data_dir, images=dict(sorted(fixes.items())))
+
+
 def _saved(data_dir: Path) -> dict:
     path = data_dir / SETTINGS
     try:

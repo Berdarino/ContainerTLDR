@@ -11,7 +11,7 @@ from starlette.testclient import TestClient
 
 from containertldr import web
 from containertldr.__main__ import write_heartbeat, write_last_run
-from containertldr.config import Config, load, read_settings
+from containertldr.config import Config, load, read_fixes, read_settings
 from containertldr.discovery import ImageGroup, LocalImage
 from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
@@ -395,6 +395,49 @@ def test_testing_the_github_token():
     core = {"limit": 60, "remaining": 59}
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"resources": {"core": core}}))
     assert try_github(Config(notify_urls=["x"]), transport) == "59 of 60 requests left this hour, without a token."
+
+
+APP = "ghcr.io/someone/app"
+
+
+def test_fixing_an_image(tmp_path):
+    c = logged_in(tmp_path, docker=FakeDocker([group(f"{APP}:latest", {VERSION: "2.1.0"})]), env=environment(tmp_path))
+    assert f'<a href="/containers/{APP}">Change how it' in c.get("/containers").text
+    page = c.get(f"/containers/{APP}")
+    assert 'name="repo" value="" placeholder="someone/app"' in page.text  # what the guess would be
+    assert "Running in app (<code>ghcr.io/someone/app:latest</code>)." in page.text
+    token = csrf(page)
+    form = {"csrf": token, "repo": "someone/app-server", "version": "env:APP_VERSION", "commits": ""}
+    response = c.post(f"/containers/{APP}", data=form, follow_redirects=False)
+    assert (response.status_code, response.headers["location"]) == (303, f"/containers/{APP}?saved")
+    assert read_fixes(tmp_path) == {APP: {"repo": "someone/app-server", "version": "env:APP_VERSION"}}
+    assert "fixed in the web UI" in c.get("/containers").text
+    c.post(f"/containers/{APP}", data={"csrf": token, "remove": "1"})
+    assert read_fixes(tmp_path) == {}
+
+
+def test_a_bad_fix_is_not_saved(tmp_path):
+    c = logged_in(tmp_path, docker=FakeDocker([group(f"{APP}:latest")]), env=environment(tmp_path))
+    form = {"repo": "app-server", "version": "APP_VERSION", "notes_url": "javascript:alert(1)"}
+    response = c.post(f"/containers/{APP}", data={"csrf": csrf(c.get(f"/containers/{APP}")), **form})
+    assert response.status_code == 400 and read_fixes(tmp_path) == {}
+    text = html.unescape(response.text)
+    assert "The repo should be owner/name, like Radarr/Radarr, not 'app-server'" in text
+    assert "containertldr.version should be label, env:NAME or none, not 'APP_VERSION'" in text
+    assert "The notes URL should start with https://" in text
+    assert 'name="repo" value="app-server"' in response.text  # what was typed stays
+
+
+def test_labels_win_over_a_fix(tmp_path):
+    labelled = group(f"{APP}:latest", container_labels={"containertldr.repo": "me/fork"})
+    c = logged_in(tmp_path, docker=FakeDocker([labelled]), env=environment(tmp_path))
+    page = c.get(f"/containers/{APP}").text
+    assert page.count("wins over this") == 1 and "The label on app wins over this." in page
+
+
+def test_fixes_need_a_password(tmp_path):
+    assert client(tmp_path).get(f"/containers/{APP}").status_code == 404
+    assert "Change how it" not in client(tmp_path, FakeDocker([group(f"{APP}:latest")])).get("/containers").text
 
 
 def test_broken_saved_settings_are_shown(tmp_path):

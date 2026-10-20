@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from starlette.applications import Starlette
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,12 +20,14 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
-from ..config import Config, ConfigError, load, read_fixes, read_settings, write_settings
+from ..config import Config, ConfigError, load, read_fixes, read_settings, write_fixes, write_settings
 from ..discovery import Docker, ImageGroup
-from ..resolve import GUESSES, Upstream, load_mappings, resolve
+from ..registry import ImageRef, parse_ref
+from ..resolve import GUESSES, Upstream, image_key, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
+from .fixes import FIELDS, LABEL_NAMES, defaults, fix_from, fix_problems, overridden
 from .jobs import Jobs, secrets_of, try_docker, try_github, try_llm, try_notify
 from .settings import form_rows, problems, updated
 
@@ -43,6 +46,10 @@ class Row:
     version: str | None
     entry: Entry | None  # there while a newer image is known
     error: str | None = None
+
+    @property
+    def key(self) -> str:
+        return image_key(self.group.image.name)
 
     @property
     def guessed(self) -> bool:
@@ -131,6 +138,43 @@ def create_app(
         context |= {"groups": groups, "other_problems": [p for p in found if p not in placed]}
         return templates.TemplateResponse(request, "settings.html", context, status_code=status_code)
 
+    async def image_fix(request: Request) -> Response:
+        if not request.path_params["image"]:
+            raise HTTPException(404)
+        key, in_use = image_key(request.path_params["image"]), current()
+        try:
+            running = await run_in_threadpool(
+                docker_at(in_use.docker_host).running, in_use.include_label, in_use.exclude_label
+            )
+            fixes = read_fixes(config.data_dir)
+        except (httpx.HTTPError, ConfigError) as e:
+            return templates.TemplateResponse(request, "fix.html", {"key": key, "error": str(e)})
+        groups = [g for g in running if image_key(g.image.name) == key]
+        image = groups[0].image if groups else parse_ref(key)
+        if request.method == "GET":
+            return fix_page(request, key, image, groups, fixes.get(key, {}), saved="saved" in request.query_params)
+        form = await posted(request)
+        fix = {} if form.get("remove") else fix_from(form)
+        if found := fix_problems(image, key, fix, mappings):  # nothing is saved then
+            return fix_page(request, key, image, groups, fix, status_code=400, problems=found)
+        write_fixes(config.data_dir, {k: v for k, v in (fixes | {key: fix}).items() if v})
+        log.info("fix for %s saved in the web UI", key)
+        return RedirectResponse(f"/containers/{key}?saved", status_code=303)
+
+    def fix_page(
+        request: Request, key: str, image: ImageRef, groups: list, fix: dict, status_code=200, **context
+    ) -> Response:
+        context |= {
+            "key": key,
+            "groups": groups,
+            "fix": fix,
+            "fields": FIELDS,
+            "label_names": LABEL_NAMES,
+            "defaults": defaults(image, groups, mappings),
+            "overridden": overridden(groups),
+        }
+        return templates.TemplateResponse(request, "fix.html", context, status_code=status_code)
+
     jobs = Jobs()
 
     async def testing(request: Request) -> Response:
@@ -182,6 +226,7 @@ def create_app(
         return Starlette(routes=routes)
     routes += [
         Route("/settings/test", testing, methods=["GET", "POST"]),
+        Route("/containers/{image:path}", image_fix, methods=["GET", "POST"]),
         Route("/login", login, methods=["GET", "POST"]),
         Route("/logout", logout, methods=["POST"]),
     ]

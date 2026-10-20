@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ key }}{% endblock %}
+{% block main %}
+<h2><code>{{ key }}</code></h2>
+{% if error %}
+<p class="errors">{{ error }}</p>
+{% else %}
+<p class="muted">How checks read this image, for every container that runs it, whatever its tag. A
+<code>containertldr.*</code> label on a container wins over what's set here. An empty field means what ContainerTLDR
+would do anyway, shown greyed out.</p>
+{% if groups %}
+<p>Running in {% for group in groups %}{{ group.containers | join(", ") }} (<code>{{ group.ref }}</code>){{ ", " if not loop.last }}{% endfor %}.</p>
+{% else %}
+<p class="muted">No running container uses this image now.</p>
+{% endif %}
+{% if saved %}<p class="ok">Saved. The next check uses it.</p>{% endif %}
+{% if problems %}
+<ul class="errors">
+  {% for problem in problems %}
+  <li>{{ problem }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+<form method="post" action="/containers/{{ key }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="scroll">
+  <table class="settings">
+    {% for name, help in fields.items() %}
+    <tr>
+      <td>
+        <label for="{{ name }}"><code>{{ label_names[name] }}</code></label>
+        <div class="muted">{{ help }}</div>
+      </td>
+      <td>
+        {% if name == "commits" %}
+        <select id="commits" name="commits">
+          <option value="">default ({{ defaults.commits }})</option>
+          {% for choice in ("true", "false") %}
+          <option{% if fix.commits == choice %} selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input id="{{ name }}" name="{{ name }}" value="{{ fix[name] or '' }}" placeholder="{{ defaults[name] }}">
+        {% endif %}
+        {% if overridden[name] %}
+        <div class="warn">The label on {{ overridden[name] | join(", ") }} wins over this.</div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p>
+    <button>Save</button>
+    {% if fix and not problems %}<button name="remove" value="1">Remove the fix</button>{% endif %}
+  </p>
+</form>
+{% endif %}
+<p><a href="/containers">Back to the containers</a></p>
+{% endblock %}
