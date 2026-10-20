@@ -6,10 +6,13 @@ import apprise
 import httpx
 
 from .messages import (
+    TEST_BODY,
+    TEST_TITLE,
     Rebuild,
     Update,
     discord_errors,
     discord_rebuilds,
+    discord_test,
     discord_update,
     plain_errors,
     plain_rebuilds,
@@ -77,10 +80,14 @@ class Notifier:
         if errors:
             self._send(discord_errors(errors), *plain_errors(errors))
 
-    def _send(self, payload: dict, title: str, body: str) -> None:
+    def test(self) -> int:
+        """A short message for the settings page's test. How many targets took it."""
+        return self._send(discord_test(), TEST_TITLE, TEST_BODY)
+
+    def _send(self, payload: dict, title: str, body: str) -> int:
         if self.dry_run:
             print(f"{title}\n{body}\n")
-            return
+            return 0
         sent = 0
         for webhook, bot in self.discord:
             try:
@@ -95,6 +102,7 @@ class Notifier:
                 log.warning("%d Apprise target(s) failed, see Apprise's log", result.failed_count)
         if not sent:
             raise NotifyError(f"no notification target took {title!r}")
+        return sent
 
     def _post_discord(self, webhook: str, payload: dict) -> None:
         for attempt in range(3):

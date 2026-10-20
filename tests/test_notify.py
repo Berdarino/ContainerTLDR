@@ -121,6 +121,14 @@ def test_every_target_failing_is_an_error():
         Notifier(["discord://123/AbC-token"], transport=transport).update(UPDATE)
 
 
+def test_test_message_counts_who_took_it(apprise_calls):
+    requests = []
+    transport = responding(httpx.Response(204), requests=requests)
+    assert Notifier(["discord://123/AbC-token", "ntfy://ntfy.sh/updates"], transport=transport).test() == 2
+    assert json.loads(requests[0].content)["embeds"][0]["title"] == "[TEST] ContainerTLDR"
+    assert apprise_calls[0]["title"] == "[TEST] ContainerTLDR"
+
+
 def test_bad_url_is_rejected_without_showing_it():
     with pytest.raises(ValueError, match=r"notaservice://\*\*\*") as error:
         Notifier(["notaservice://admin:hunter2@notify.lan/updates"])

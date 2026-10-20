@@ -16,7 +16,7 @@ from containertldr.pipeline import RunResult
 from containertldr.registry import parse_ref
 from containertldr.state import Entry, State, state_key
 from containertldr.web import create_app
-from containertldr.web.jobs import Jobs, try_github
+from containertldr.web.jobs import Jobs, try_github, try_notify
 
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
@@ -360,6 +360,13 @@ def test_testing_docker_from_the_settings_page(tmp_path):
         time.sleep(0.01)
     assert '<p class="ok">Docker works' in page and "2 running containers to check, on 2 images." in page
     assert c.post("/settings/test", data={"csrf": token, "test": "everything"}).status_code == 400
+
+
+def test_testing_notifications(monkeypatch):
+    monkeypatch.setattr("containertldr.notify.time.sleep", lambda seconds: None)
+    transport = httpx.MockTransport(lambda r: httpx.Response(404 if "/gone" in r.url.path else 204))
+    config = Config(notify_urls=["discord://1/works", "discord://2/gone"])
+    assert try_notify(config, transport) == "Sent to 1 of 2 notification targets, see the log for the rest."
 
 
 def test_testing_the_github_token():

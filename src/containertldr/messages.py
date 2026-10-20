@@ -4,6 +4,7 @@ from dataclasses import dataclass
 BLUE, GREY = 0x3B82F6, 0x9CA3AF
 REBUILDS_TITLE = "🔁 Rebuilt images (same app version, base OS/library updates)"
 ERRORS_TITLE = "⚠️ Update check had errors"
+TEST_TITLE, TEST_BODY = "[TEST] ContainerTLDR", "Sent from the settings page. Update notifications will arrive here."
 # Discord's limits, in characters
 TITLE_MAX, DESCRIPTION_MAX, FIELD_MAX, FOOTER_MAX, EMBED_MAX, CONTENT_MAX = 256, 4096, 1024, 2048, 6000, 2000
 NO_MENTIONS = {"parse": []}  # the summary comes from release notes, which must never ping anyone
@@ -64,6 +65,10 @@ def discord_rebuilds(rebuilds: list[Rebuild]) -> dict:
 def discord_errors(errors: list[str]) -> dict:
     title, body = plain_errors(errors)
     return {"content": _cut(f"{title}\n{body}", CONTENT_MAX), "allowed_mentions": NO_MENTIONS}
+
+
+def discord_test() -> dict:
+    return {"embeds": [{"title": TEST_TITLE, "description": TEST_BODY, "color": GREY}], "allowed_mentions": NO_MENTIONS}
 
 
 def plain_update(update: Update) -> tuple[str, str]:

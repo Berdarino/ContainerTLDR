@@ -8,6 +8,7 @@ import httpx
 from ..config import Config
 from ..discovery import Docker
 from ..github import GitHub
+from ..notify import Notifier
 
 
 @dataclass
@@ -57,6 +58,14 @@ def try_docker(docker: Docker, config: Config) -> str:
     groups = docker.running(config.include_label, config.exclude_label)
     containers = sum(len(g.containers) for g in groups)
     return f"{containers} running containers to check, on {len(groups)} images."
+
+
+def try_notify(config: Config, transport: httpx.BaseTransport | None = None) -> str:
+    notifier = Notifier(config.notify_urls, transport=transport)
+    targets = len(notifier.discord) + len(notifier.apprise)
+    sent = notifier.test()  # NotifyError if none took it
+    rest = "" if sent == targets else ", see the log for the rest"
+    return f"Sent to {sent} of {targets} notification targets{rest}."
 
 
 def try_github(config: Config, transport: httpx.BaseTransport | None = None) -> str:

@@ -25,7 +25,7 @@ from ..resolve import GUESSES, Upstream, load_mappings, resolve
 from ..state import Entry, State, state_key
 from ..versions import read_version
 from .auth import RequireLogin, page_context, posted, same_password, session_key
-from .jobs import Jobs, secrets_of, try_docker, try_github
+from .jobs import Jobs, secrets_of, try_docker, try_github, try_notify
 from .settings import form_rows, problems, updated
 
 log = logging.getLogger(__name__)
@@ -135,6 +135,7 @@ def create_app(
         form = await posted(request)
         in_use = current()
         tests = {
+            "notify": ("Notifications", lambda: try_notify(in_use)),
             "docker": ("Docker", lambda: try_docker(docker_at(in_use.docker_host), in_use)),
             "github": ("GitHub", lambda: try_github(in_use)),
         }
