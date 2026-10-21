@@ -7,6 +7,7 @@ from collections.abc import Callable
 log = logging.getLogger(__name__)
 
 _DOCKER_HUB = re.compile(r"(.+\.)?docker\.io")  # registry-1.docker.io, as What's Up Docker names it
+_DOCKHAND_LINE = re.compile(r"^- \S+ \((\S+)\): ", re.MULTILINE)  # "- radarr (lscr.io/linuxserver/radarr:latest): "
 
 
 class Hooks:
@@ -65,9 +66,19 @@ def wud(body: object) -> list[str]:
     return images
 
 
+def dockhand(body: object) -> list[str]:
+    """Dockhand's json:// notification. Only its message names the images, a line per container for updates;
+    other events (a test, a container that stopped) have no such lines, so they check nothing."""
+    message = body.get("message") if isinstance(body, dict) else None
+    if not isinstance(message, str):
+        raise ValueError("expected Dockhand's JSON, with a message")
+    return list(dict.fromkeys(_DOCKHAND_LINE.findall(message)))  # once per image, however many containers run it
+
+
 # How each sender's body names the images to check
 SENDERS: dict[str, Callable[[object], list[str]]] = {
     "generic": generic,
     "diun": generic,  # Diun's notifications name the image the same way, next to fields of its own
     "wud": wud,
+    "dockhand": dockhand,
 }

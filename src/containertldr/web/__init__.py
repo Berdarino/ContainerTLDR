@@ -205,6 +205,8 @@ def create_app(
             images = read(await request.json())
         except ValueError as e:  # not JSON, or not what this sender sends
             return PlainTextResponse(str(e), status_code=400)
+        if not images:  # e.g. a sender's own test message, which shouldn't look like a failure there
+            return PlainTextResponse("Nothing to check.")
         for image in images:
             hooks.add(image)
         log.info("webhook from %s: checking %s", request.path_params["sender"], ", ".join(images))

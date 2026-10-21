@@ -1,3 +1,4 @@
+import base64
 import html
 import json
 import re
@@ -260,6 +261,29 @@ def test_diun_and_wud_webhooks(tmp_path, monkeypatch):
     expected += ["homeassistant/home-assistant:2024.6.4", "lscr.io/linuxserver/radarr:latest", "library/redis:8"]
     assert wait_for(images, 5) == expected
     assert c.post("/hooks/wud", json={"rollback": True}, headers=bearer).status_code == 400
+
+
+def test_the_dockhand_webhook(tmp_path, monkeypatch):
+    images = hooked(monkeypatch)
+    c = client(tmp_path, webhook_token=TOKEN)
+    # Dockhand can't set headers; json://containertldr:<token>@host/hooks/dockhand makes it send Basic auth
+    basic = {"Authorization": "Basic " + base64.b64encode(f"containertldr:{TOKEN}".encode()).decode()}
+    test = {
+        "title": "Dockhand Test Notification",
+        "message": "This is a test notification from Dockhand.",
+        "type": "info",
+        "environment": None,
+        "timestamp": "2026-10-21T01:37:59.059Z",
+    }
+    assert c.post("/hooks/dockhand", json=test, headers=basic).text == "Nothing to check."
+    updates = (HOOKS / "dockhand.json").read_bytes()
+    response = c.post("/hooks/dockhand", content=updates, headers={**basic, "Content-Type": "application/json"})
+    assert response.status_code == 202
+    expected = ["lscr.io/linuxserver/sonarr:latest", "redis:8.8-alpine", RADARR, "tailscale/tailscale:latest"]
+    expected += ["jellyfin/jellyfin:latest", "ghcr.io/home-assistant/home-assistant:stable"]
+    assert wait_for(images, 6) == expected  # sonarr and sonarr-anime share one check
+    wrong = {"Authorization": "Basic " + base64.b64encode(b"containertldr:a-guess").decode()}
+    assert c.post("/hooks/dockhand", content=updates, headers=wrong).status_code == 401
 
 
 def test_webhook_checks_queue_up():

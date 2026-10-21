@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import secrets
@@ -28,9 +29,17 @@ def same_password(attempt: str, password: str) -> bool:
 
 
 def sent_token(request: Request) -> str:
-    """A webhook's token, from an Authorization: Bearer header or, for senders that can't set one, ?token=."""
-    scheme, _, token = request.headers.get("authorization", "").partition(" ")
-    return token.strip() if scheme.lower() == "bearer" else request.query_params.get("token", "")
+    """A webhook's token: a Bearer token, the password of Basic auth (all Dockhand can send, from
+    json://name:token@host), or for senders that can do neither, ?token=."""
+    scheme, _, credentials = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() == "bearer":
+        return credentials.strip()
+    if scheme.lower() == "basic":
+        try:
+            return base64.b64decode(credentials).decode().partition(":")[2]
+        except ValueError:  # not base64, or not text
+            return ""
+    return request.query_params.get("token", "")
 
 
 class RequireLogin(BaseHTTPMiddleware):
