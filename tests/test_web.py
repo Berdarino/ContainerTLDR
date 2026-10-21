@@ -134,7 +134,8 @@ def test_containers(tmp_path):
     assert '<a href="https://www.postgresql.org/docs/release/">' in page  # no GitHub repo, but a changelog
     assert "<code>containertldr.repo=someone/app-server</code>" in page
     assert 'class="fix"' not in page
-    assert page.index("someone/app:latest") < page.index("postgres:18") < page.index(RADARR)  # by container
+    assert page.index("app:latest") < page.index("postgres:18") < page.index("radarr:latest")  # by container
+    assert "<code>lscr.io/<wbr>linuxserver/<wbr>radarr:latest</code>" in page  # breaks between the parts
 
 
 def test_containers_with_a_fix(tmp_path):

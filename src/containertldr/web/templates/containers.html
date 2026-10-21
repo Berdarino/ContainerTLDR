@@ -31,7 +31,8 @@
         {% endfor %}
       </td>
       <td>
-        <code>{{ row.group.ref }}</code>
+        {# escaped first, then a line may break after each slash rather than in the middle of a name #}
+        <code>{{ row.group.ref | replace("/", "/<wbr>" | safe) }}</code>
         {% if logged_in %}<div><a href="/containers/{{ row.key }}">Change how it's read</a></div>{% endif %}
       </td>
       {% if row.error %}
