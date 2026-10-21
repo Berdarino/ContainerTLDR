@@ -31,6 +31,10 @@ listed together in one short message.
 
 ContainerTLDR never updates or restarts anything. It only tells you.
 
+An optional [web UI](#web-ui) keeps the summaries of the updates you haven't deployed yet:
+
+![The status page: the last check, and a Radarr update waiting to be deployed, with its summary](docs/status.png)
+
 ## How it works
 
 1. On a schedule (04:30 by default) it lists your running containers through the Docker API. A
@@ -151,6 +155,9 @@ UI:
   `CTLDR_WEB_PASSWORD`.
 - Settings: the settings from the table above, to change and save, and buttons that test notifications, the LLM,
   Docker and the GitHub token. Only with `CTLDR_WEB_PASSWORD`.
+
+![The containers page: each image with where its release notes come from and its version; a guessed repo is
+highlighted](docs/containers.png)
 
 Without `CTLDR_WEB_PASSWORD`, the status and containers pages are open to anyone who can reach the port, so keep it
 on your LAN, or put it behind your reverse proxy's authentication if it's reachable from further away. With a
