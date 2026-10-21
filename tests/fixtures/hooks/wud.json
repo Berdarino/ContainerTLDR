@@ -1,0 +1,54 @@
+[
+  {
+    "id": "31a61a8305ef1fc9a71fa4f20a68d7ec88b28e32303bbc4a5f192e851165b816",
+    "name": "homeassistant",
+    "watcher": "local",
+    "includeTags": "^\\d+\\.\\d+\\.\\d+$",
+    "image": {
+      "id": "sha256:d4a6fafb7d4da37495e5c9be3242590be24a87d7edcc4f79761098889c54fca6",
+      "registry": {"name": "hub", "url": "https://registry-1.docker.io/v2"},
+      "name": "homeassistant/home-assistant",
+      "tag": {"value": "2024.6.4", "semver": true},
+      "digest": {"watch": false, "repo": "sha256:ca0edc3fb0b4647963629bdfccbb3ccfa352184b45a9b4145832000c2878dd72"},
+      "architecture": "amd64",
+      "os": "linux",
+      "created": "2024-06-12T05:33:38.440Z"
+    },
+    "result": {"tag": "2024.6.5"},
+    "updateAvailable": true
+  },
+  {
+    "id": "8e2f1c0b9a7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f",
+    "name": "radarr",
+    "watcher": "local",
+    "image": {
+      "id": "sha256:7f6e5d4c3b2a19087f6e5d4c3b2a19087f6e5d4c3b2a19087f6e5d4c3b2a1908",
+      "registry": {"name": "lscr", "url": "https://lscr.io/v2"},
+      "name": "linuxserver/radarr",
+      "tag": {"value": "latest", "semver": false},
+      "digest": {"watch": true, "repo": "sha256:0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"},
+      "architecture": "amd64",
+      "os": "linux",
+      "created": "2026-10-08T04:12:00.000Z"
+    },
+    "result": {"tag": "latest", "digest": "sha256:9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0"},
+    "updateAvailable": true
+  },
+  {
+    "id": "c0ffee0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "name": "redis",
+    "watcher": "local",
+    "image": {
+      "id": "sha256:aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44",
+      "registry": {"name": "hub", "url": "https://registry-1.docker.io/v2"},
+      "name": "library/redis",
+      "tag": {"value": "8", "semver": false},
+      "digest": {"watch": true, "repo": "sha256:bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55"},
+      "architecture": "amd64",
+      "os": "linux",
+      "created": "2026-10-10T04:00:00.000Z"
+    },
+    "result": {"tag": "8", "digest": "sha256:cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66"},
+    "updateAvailable": true
+  }
+]

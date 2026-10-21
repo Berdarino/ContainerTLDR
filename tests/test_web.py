@@ -5,6 +5,7 @@ import threading
 import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -22,6 +23,7 @@ from containertldr.web.hooks import Hooks
 from containertldr.web.jobs import Failed, Jobs, try_github, try_llm, try_notify, try_summary
 from containertldr.web.markdown import markdown
 
+HOOKS = Path(__file__).parent / "fixtures" / "hooks"  # shaped like the senders' documented examples
 RADARR = "lscr.io/linuxserver/radarr:latest"
 VERSION = "org.opencontainers.image.version"
 FOOTER = "Summarised by qwen3:8b from 1 release note"
@@ -243,6 +245,21 @@ def test_the_generic_webhook(tmp_path, monkeypatch):
     assert c.post(f"/hooks/generic?token={TOKEN}", json={"name": "redis"}).status_code == 400
     assert c.post(f"/hooks/generic?token={TOKEN}", content="not JSON").status_code == 400
     assert c.post(f"/hooks/nobody?token={TOKEN}", json={"image": RADARR}).status_code == 404
+
+
+def test_diun_and_wud_webhooks(tmp_path, monkeypatch):
+    images = hooked(monkeypatch)
+    c = client(tmp_path, webhook_token=TOKEN)
+    bearer = {"Authorization": f"Bearer {TOKEN}"}
+    diun = json.loads((HOOKS / "diun.json").read_text())
+    assert c.post("/hooks/diun", json=diun, headers=bearer).status_code == 202
+    wud = json.loads((HOOKS / "wud.json").read_text())
+    assert c.post("/hooks/wud", json=wud[1], headers=bearer).status_code == 202  # one container
+    assert c.post("/hooks/wud", json=wud, headers=bearer).status_code == 202  # batch mode
+    expected = ["docker.io/jellyfin/jellyfin:latest", "lscr.io/linuxserver/radarr:latest"]
+    expected += ["homeassistant/home-assistant:2024.6.4", "lscr.io/linuxserver/radarr:latest", "library/redis:8"]
+    assert wait_for(images, 5) == expected
+    assert c.post("/hooks/wud", json={"rollback": True}, headers=bearer).status_code == 400
 
 
 def test_webhook_checks_queue_up():

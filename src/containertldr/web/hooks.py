@@ -1,9 +1,12 @@
 import logging
 import queue
+import re
 import threading
 from collections.abc import Callable
 
 log = logging.getLogger(__name__)
+
+_DOCKER_HUB = re.compile(r"(.+\.)?docker\.io")  # registry-1.docker.io, as What's Up Docker names it
 
 
 class Hooks:
@@ -47,5 +50,24 @@ def generic(body: object) -> list[str]:
     return [image.strip()]
 
 
+def wud(body: object) -> list[str]:
+    """What's Up Docker's HTTP trigger: a container, or a list of them in batch mode."""
+    images = []
+    for container in body if isinstance(body, list) else [body]:
+        try:
+            image = container["image"]
+            # Put together the way WUD does it, e.g. "https://ghcr.io/v2" and "linuxserver/radarr"
+            host = re.sub(r"^https?://|/v2/?$", "", image["registry"]["url"])
+            name = image["name"] if _DOCKER_HUB.fullmatch(host) else f"{host}/{image['name']}"
+            images.append(f"{name}:{image['tag']['value']}")
+        except (KeyError, TypeError) as e:
+            raise ValueError("expected What's Up Docker's container JSON") from e
+    return images
+
+
 # How each sender's body names the images to check
-SENDERS: dict[str, Callable[[object], list[str]]] = {"generic": generic}
+SENDERS: dict[str, Callable[[object], list[str]]] = {
+    "generic": generic,
+    "diun": generic,  # Diun's notifications name the image the same way, next to fields of its own
+    "wud": wud,
+}

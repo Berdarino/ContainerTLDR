@@ -1,0 +1,21 @@
+{
+  "diun_version": "4.29.0",
+  "hostname": "myserver",
+  "status": "update",
+  "provider": "docker",
+  "image": "docker.io/jellyfin/jellyfin:latest",
+  "hub_link": "https://hub.docker.com/r/jellyfin/jellyfin",
+  "mime_type": "application/vnd.oci.image.index.v1+json",
+  "digest": "sha256:3c4ae2b5a7e1d0f9b8c6a4e2d0b9f8e7c6d5a4b3c2d1e0f9a8b7c6d5e4f3a2b1",
+  "created": "2026-10-15T04:00:00Z",
+  "platform": "linux/amd64",
+  "metadata": {
+    "ctn_command": "/jellyfin/jellyfin",
+    "ctn_createdat": "2026-10-01 04:30:00 +0000 UTC",
+    "ctn_id": "1b8c4e2f6a3d",
+    "ctn_names": "jellyfin",
+    "ctn_size": "0B",
+    "ctn_state": "running",
+    "ctn_status": "Up 2 weeks"
+  }
+}
