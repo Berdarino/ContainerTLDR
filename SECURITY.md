@@ -15,10 +15,12 @@ Please report security problems privately through GitHub: open the Security tab 
 - Without `CTLDR_WEB_PASSWORD`, the web UI that `CTLDR_WEB_PORT` turns on is read-only and has no login. It shows
   container names, image references and update summaries, but no settings or secrets. Keep it on your LAN, or put
   it behind your reverse proxy's authentication if it's reachable from further away.
+- Webhooks are off unless `CTLDR_WEBHOOK_TOKEN` is set. They need that token, compared in constant time, and all
+  they can do is ask for a check of one image, the same check the schedule runs.
 - It runs as a non-root user and only writes to `/data`, so a read-only root filesystem works.
-- Secrets (notification URLs, `GITHUB_TOKEN`, the LLM API key, the web UI password, registry logins) are never
-  logged. The settings printed at startup leave them out, and notification URLs in log messages are cut down to
-  their scheme and host.
+- Secrets (notification URLs, `GITHUB_TOKEN`, the LLM API key, the web UI password, the webhook token, registry
+  logins) are never logged. The settings printed at startup leave them out, and notification URLs in log messages
+  are cut down to their scheme and host.
 
 ## The web UI's login
 

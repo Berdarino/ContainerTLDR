@@ -33,7 +33,8 @@ ContainerTLDR never updates or restarts anything. It only tells you.
 
 ## How it works
 
-1. On a schedule (04:30 by default) it lists your running containers through the Docker API.
+1. On a schedule (04:30 by default) it lists your running containers through the Docker API. A
+   [webhook](#webhooks) from Diun, What's Up Docker or Dockhand can also ask it to check one image right away.
 2. For each image it asks the registry for the tag's current digest. That's a HEAD request, which doesn't count
    against Docker Hub's pull limit.
 3. When the digest has changed, it reads the app version from the running image and the new one (the
@@ -97,9 +98,10 @@ the settings page too, but an environment variable always wins.
 | `CTLDR_WEB_PORT` | | Turns on the [web UI](#web-ui) on this port. Without it, nothing listens |
 | `CTLDR_WEB_HOST` | `0.0.0.0` | The address the web UI listens on |
 | `CTLDR_WEB_PASSWORD` | | Every web UI page asks for it, and the settings page is only there with it |
+| `CTLDR_WEBHOOK_TOKEN` | | Turns on the [webhooks](#webhooks), which need it to ask for a check |
 
-`CTLDR_NOTIFY_URLS`, `CTLDR_LLM_API_KEY`, `GITHUB_TOKEN` and `CTLDR_WEB_PASSWORD` also work with a `_FILE` suffix
-pointing at a file, for Docker secrets.
+`CTLDR_NOTIFY_URLS`, `CTLDR_LLM_API_KEY`, `GITHUB_TOKEN`, `CTLDR_WEB_PASSWORD` and `CTLDR_WEBHOOK_TOKEN` also work
+with a `_FILE` suffix pointing at a file, for Docker secrets.
 
 ## Container labels
 
@@ -164,6 +166,51 @@ limit.
 
 For an uptime monitor, `/health` answers `ok` while the scheduled check is on time and 503 when it's overdue. It
 needs no login and says nothing else.
+
+## Webhooks
+
+If you already run Diun, What's Up Docker or Dockhand, let it tell ContainerTLDR about an update as soon as it
+sees one. It keeps doing the detecting, and the summary follows right away instead of at the next scheduled check.
+
+Set `CTLDR_WEBHOOK_TOKEN` to a long random string, and `CTLDR_WEB_PORT`, since the webhooks share the web UI's
+port. Then point the other tool at ContainerTLDR (here `containertldr:8080`, on the same Docker network):
+
+| Sender | URL | Token |
+|---|---|---|
+| Diun | `http://containertldr:8080/hooks/diun` | `Authorization: Bearer <token>` header |
+| What's Up Docker | `http://containertldr:8080/hooks/wud` | Bearer auth |
+| Dockhand | `json://containertldr:<token>@containertldr:8080/hooks/dockhand` | in the URL |
+| Anything else | `http://containertldr:8080/hooks/generic`, posting `{"image": "redis:8"}` | `Authorization: Bearer <token>`, or `?token=<token>` |
+
+Diun's webhook notification needs `method: POST`, since its default is GET:
+
+```yaml
+notif:
+  webhook:
+    endpoint: http://containertldr:8080/hooks/diun
+    method: POST
+    headers:
+      authorization: Bearer <token>
+```
+
+What's Up Docker's HTTP trigger:
+
+```yaml
+WUD_TRIGGER_HTTP_CONTAINERTLDR_URL: http://containertldr:8080/hooks/wud
+WUD_TRIGGER_HTTP_CONTAINERTLDR_AUTH_TYPE: BEARER
+WUD_TRIGGER_HTTP_CONTAINERTLDR_AUTH_BEARER: <token>
+```
+
+In Dockhand, add an Apprise channel with the URL above (`jsons://` for https) and link it to the environment's
+"updates detected" event. Other events are accepted but checked for nothing.
+
+- A webhook is answered at once. The check, and the summary, follow one image at a time, and never alongside a
+  scheduled check.
+- It's an ordinary check of that image, so an update is still reported only once, whichever noticed it first.
+- Only the tag you run is checked. A notice about a newer tag, like What's Up Docker's semver updates, finds
+  nothing new.
+- Webhooks don't use the web UI's login, only the token. Prefer a header to `?token=`, since a URL can end up in a
+  reverse proxy's log.
 
 ## Models
 
